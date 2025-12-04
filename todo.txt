@@ -34,3 +34,5 @@ when done.
 For most of the work make a 8008 to 8080 translator in python for the mnewmonics
 and/or binary decode.  The comments and naming data will need followup work on the output.
 But make a tool as after doing the above .asm do the two add on books.
+
+For a good reference to writing for CP/M see ~/src/cpmemu/docs/cpm22*.pdf
