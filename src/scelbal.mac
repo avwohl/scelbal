@@ -95,12 +95,12 @@ FPACC_MSW:
 	DB	000H
 FPACC_EXP:
 	DB	000H
-FPOP_EXT:                               ; FPOP extension (4 bytes)
+FPOP_EXT:                               ; FPOP extension (now 7 bytes to avoid overlapping FPOP)
 	DB	000H,000H
 FPOP_EXT_5B:                            ; FPOP extension offset 2
 	DB	000H
-FPOP_EXT_59:                            ; Last byte of FPOP extension
-	DB	000H
+FPOP_EXT_59:                            ; Extension byte, immediately before FPOP for mult
+	DB	000H                        ; MUST be 1 byte, contiguous with FPOP for 6-byte mult
 FPOP:                                   ; FPOP (LSW, NSW, MSW, Exponent)
 FPOP_LSW:
 	DB	000H
@@ -168,6 +168,13 @@ FP_WORK_77:
 	DB	000H
 FP_WORK_78:
 	DB	000H
+DIV_WORK:                               ; Division working area (3 bytes) - separate from FPOP
+DIV_WORK_LSW:
+	DB	000H
+DIV_WORK_NSW:
+	DB	000H
+DIV_WORK_MSW:
+	DB	000H
 FPACC_SAVE:                             ; FPACC save area (4 bytes)
 	DB	000H,000H,000H,000H
 SCRATCH_PAD1:                           ; Scratch pad area (4 bytes)
@@ -197,6 +204,8 @@ BITS_COUNTER:                           ; Bits counter
 	DB	000H
 SIGN_IND2:                              ; Sign indicator 2
 	DB	000H
+FPFLT_FLAG:                             ; Flag for FPFLT vs FPNORM path
+	DB	000H
 EXP_SIGNS:                              ; Exponent sign indicator
 	DB	000H
 INP_DIG_CNT:                            ; Input digit counter
@@ -212,6 +221,23 @@ GETINP_CNT:                             ; GETINP counter
 	DB	000H
 ARITH_STKPTR:                           ; Arithmetic stack pointer
 	DB	000H
+
+;;; =========================================================================
+;;; Arithmetic Stack Buffer (for expression evaluation)
+;;; Original 8008 code used page 01 offsets 94H-FFH. We need an explicit buffer.
+;;; Stack grows upward from ARITH_STACK, pointer starts at LOW(ARITH_STACK)-4
+;;; and is incremented by 4 for each push.
+;;; =========================================================================
+
+	DB	0,0,0,0                 ; Padding to align ARITH_STACK at nice offset
+ARITH_STACK:                            ; Arithmetic stack buffer (108 bytes max)
+	DB	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  ; 16 bytes
+	DB	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  ; 32 bytes
+	DB	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  ; 48 bytes
+	DB	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  ; 64 bytes
+	DB	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  ; 80 bytes
+	DB	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0  ; 96 bytes
+	DB	0,0,0,0,0,0,0,0,0,0,0,0         ; 108 bytes total
 
 ;;; =========================================================================
 ;;; FOR/NEXT Storage
@@ -280,13 +306,14 @@ save:
 load:	JMP EXEC                        ; By default, save and load isn't implemented.
 
 ;;; CP/M CHARACTER INPUT - uses BDOS function 1 (C_READ)
-;;; Returns character in A
+;;; Returns character in A with bit 7 set (SCELBAL uses high-bit ASCII)
 
 CINP:	PUSH B
 	PUSH D
 	PUSH H
 	MVI C,C_READ                    ; BDOS function 1: console input
 	CALL BDOS                       ; Call BDOS, char returned in A
+	ORI 080H                        ; Set bit 7 for SCELBAL ASCII convention
 	POP H
 	POP D
 	POP B
@@ -296,11 +323,13 @@ CINP:	PUSH B
 UDEFX:	JMP 0                           ; Warm boot on undefined function
 
 ;;; CP/M CHARACTER OUTPUT - uses BDOS function 2 (C_WRITE)
-;;; Character to print in A
+;;; Character to print in A (with bit 7 set for SCELBAL ASCII)
+;;; Clears bit 7 for CP/M 7-bit ASCII output
 
 CPRINT:	PUSH B
 	PUSH D
 	PUSH H
+	ANI 07FH                        ; Clear bit 7 for CP/M ASCII
 	MOV E,A                         ; Character to E for BDOS
 	MVI C,C_WRITE                   ; BDOS function 2: console output
 	CALL BDOS                       ; Call BDOS
@@ -447,8 +476,16 @@ STRCPL:	CALL ADV                        ;Advance the pointer to string number 1 
 	MOV A,M                         ;Character from that string into the accumulator.
 	CALL SWITCH                     ;Now switch the pointers to string number 2.
 	CALL ADV                        ;Advance the pointer in line number 2.
-STRCPE:	CMP M                           ;Compare char in stxing 1 (ACC) to string 2 (memory)
-	RNZ                             ;If not equal, return to cauer with flags set to non-zero
+STRCPE:	PUSH B                          ;Save BC (B has string length counter)
+	MOV C,A                         ;Save char from string 1 in C
+	ANI 07FH                        ;Mask off bit 7 from string 1 char
+	MOV B,A                         ;Save masked char in B
+	MOV A,M                         ;Get char from string 2
+	ANI 07FH                        ;Mask off bit 7 from string 2 char
+	CMP B                           ;Compare masked characters
+	MOV A,C                         ;Restore original char to A (for other uses)
+	POP B                           ;Restore BC
+	RNZ                             ;If not equal, return to caller with flags set to non-zero
 	CALL SWITCH                     ;Else, exchange pointers to restore pntr to string 1
 	DCR B                           ;Decrement the string length counter in register B
 	JNZ STRCPL                      ;If not finiahed, continue testing entire string
@@ -485,18 +522,23 @@ LOOP:	MOV B,M                         ;Fetch memory location pointed to by H & L
 STRIN:	MVI C,000H                      ;Initialize register C to zero.
 STRIN1:	CALL CINPUT                     ;Call user provided device input subroutine to fetch one
 	CPI 0FFH                        ;Character from the input device. Is it ASCII code for
-	JNZ NOTDEL                      ;Rubout? Skip to next section if not rubout.
+	JZ DORUB                        ;Rubout (DEL=0x7F + 0x80)? Go handle delete.
+	CPI 088H                        ;Also check for backspace (BS=0x08 + 0x80)
+	JNZ NOTDEL                      ;Skip to next section if not delete.
+DORUB:
 	MVI A,0DCH                      ;Else, load ASCII code for backslash into ACC.
 	CALL ECHO                       ;Call user display driver to present backslash as a delete
 	DCR C                           ;Indicator. Now decrement the input character counter.
 	JM STRIN                        ;If at beginning of line do NOT decrement H and L.
 	CALL DEC                        ;Else, decrement H & L line pointer to erase previous
 	JMP STRIN1                      ;Entry, then go back for a new input.
-NOTDEL:	CPI 083H                        ;See if character inputted was'CONTROL C'
+NOTDEL:	CPI 083H                        ;See if character inputted was CONTROL C (0x03+0x80)
 	JZ CTRLC                        ;If so, stop inputting and go back to the EXECutive
-	CPI 08DH                        ;If not, see if character was carriage-return
+	CPI 09AH                        ;See if character was Ctrl-Z/EOF (0x1A+0x80)
+	JZ STRINF                       ;If so, treat as end of line (EOF from pipe)
+	CPI 08DH                        ;If not, see if character was carriage-return (0x0D+0x80)
 	JZ STRINF                       ;If so, have end of line of input
-	CPI 08AH                        ;If not, see if character was line-feed
+	CPI 08AH                        ;If not, see if character was line-feed (0x0A+0x80)
 	JZ STRIN1                       ;If so, ignore the input, get another character
 	CALL ADV                        ;If none of the above, advance contents of H & L
 	INR C                           ;Increment the character counter
@@ -591,8 +633,8 @@ ECHO:	MOV D,H                         ;Save entry value of H in register D
 CINPUT:	JMP CINP                        ;Reference to user defined input subroutine
 
 EVAL:	LXI H,ARITH_STKPTR              ;Load HL with address of ARITHMETIC STACK pointer
-	MVI M,094H                      ;Initialize ARITH STACK pointer value to addr minus 4
-	INX H                           ;Advance memory pointer to FUN/ARRAY STACK pntr
+	MVI M,LOW ARITH_STACK - 4       ;Initialize ARITH STACK pointer value to addr minus 4
+	LXI H,FA_STKPTR                 ;Load HL with address of FUN/ARRAY STACK pointer
 	MVI M,000H                      ;Initialize FUN/ARRAY STACK pointer to start of stack
 	CALL CLESYM                     ;Initialize the SYMBOL BUFFER to empty condition
 	XRA A                           ;Clear accumulator
@@ -643,10 +685,18 @@ SCAN5:	CPI 0AFH                        ;See if character fetched from expression
 	JMP SCANFN                      ;PARSER TOKEN and go to PARSER subroutine entry
 SCAN6:	CPI 0A8H                        ;See if character fetched from expression is
 	JNZ SCAN7                       ;If not, continue checking for an operator
-	LXI H,FA_STKPTR                 ;If yes, load L with address of FUN/ARRAY STACK
+	LXI H,FA_STKPTR                 ;If yes, load HL with address of FUN/ARRAY STACK
 	MOV B,M                         ;Pointer. Fetch the value in the stack pointer. Increment
 	INR B                           ;It to indicate number of "(" operators encountered.
 	MOV M,B                         ;Restore the updated stack pointer back to memory
+	MOV C,B                         ;Copy stack index to C for 16-bit add
+	MVI A,000H                      ;Clear A (will be used to clear FA_STACK slot)
+	PUSH PSW                        ;Save zero on stack
+	LXI H,FA_STACK-1                ;Load HL with FA_STACK base minus 1 (index starts at 1)
+	MVI B,000H                      ;Clear B for 16-bit add
+	DAD B                           ;Add BC (index) to get FA_STACK[index-1]
+	POP PSW                         ;Restore zero
+	MOV M,A                         ;Initialize this FA_STACK slot to 0 (simple grouping)
 	CALL FUNARR                     ;Call subroutine to process possible FUNCTION or
 	LXI H,PARSER_TOKEN              ;ARRAY variable subscript. Ihen set pointer to
 	MVI M,006H                      ;PARSER TOKEN storage and set value for operator
@@ -773,6 +823,7 @@ NOEXPO:	LXI H,ARITH_STKPTR              ;Load L with address of ARITHMETIC STACK
 	ADI 004H                        ;For the number of bytes required to store a number in
 	MOV M,A                         ;Floating point format. Restore pointer to mernory.
 	MOV L,A                         ;Then, change L to point to entry position in the AS
+	MVI H,HIGH ARITH_STACK          ;Set H to arithmetic stack page (8080 fix)
 	CALL FSTORE                     ;Place contents of the FPACC onto top of the AS
 	LXI H,SYMBOL_BUF                ;Change L to point to start of the SYMBOL BUFFER
 	CALL DINPUT                     ;Convert number in the buffer to floating point format
@@ -838,6 +889,7 @@ LOOKU4:	CALL SAVEHL                     ;Save current address to VARIABLES TABLE
 	ADI 004H                        ;Add four to account for next floating point forrnatted
 	MOV M,A                         ;Number to be stored in the stack. Restore the stack
 	MOV L,A                         ;Pointer to memory and set it up in register L too.
+	MVI H,HIGH ARITH_STACK          ;Set H to arithmetic stack page (8080 fix)
 	CALL FSTORE                     ;Place the value in the FPACC on the top of the
 	CALL RESTHL                     ;ARITHMETIC STACK. Restore the VARIABLES
 	CALL SWITCH                     ;TABLE pointer to H&L and move it to D&E. Now load
@@ -847,17 +899,19 @@ PARSE:	CALL CLESYM                     ;Clear the SYMBOL BUFFER
 	MOV A,M                         ;And fetch the token value into the accumulator
 	CPI 007H                        ;Is it token value for right parenthesis ")" ? If so, have
 	JZ PARSE2                       ;Special case where must perforin ops til find a "(" !
-	ADI 0A0H                        ;Else, fon-n address to HEIRARCHY IN table and
-	MOV L,A                         ;Set L to point to HEIRARCHY IN VALUE in the table
+	LXI H,HIER_IN_TBL               ;Point to hierarchy IN table
+	ADD L                           ;Add token to low byte of table address
+	MOV L,A                         ;Set L to indexed entry in table
 	MOV B,M                         ;Fetch the heirarchy value from the table to register B
 	LXI H,OP_STKPTR                 ;Set L to OPERATOR STACK pointer storage location
 	MOV C,M                         ;Fetch the OS pointer into CPU register C
 	CALL INDEXC                     ;Add OS pointer to address of OS pointer storage loc
 	MOV A,M                         ;Fetch the token value for the operator at top of the OS
-	ADI 0AFH                        ;And form address to HEIRARCHY OUT table
-	MOV L,A                         ;Set L to point to HEIRARCHY OUT VALUE in the
-	MOV A,B                         ;Table. Move the HEIRARCHY IN value to the ACC.
-	CMP M                           ;Compare the HEIRARCHY IN with the HEIRARCHY
+	LXI H,HIER_OUT_TBL              ;Point to hierarchy OUT table
+	ADD L                           ;Add token to low byte of table address
+	MOV L,A                         ;Set L to indexed entry in table
+	MOV A,B                         ;Move the HEIRARCHY IN value to the ACC.
+	CMP M                           ;Compare the HEIRARCHY IN with the HEIRARCHY OUT
 	JZ PARSE1                       ;OUT value. If heirarchy of current operator equal to or
 	JM PARSE1                       ;Less than operator on top of OS stack, perfo
 	LXI H,PARSER_TOKEN              ;Operation indicated in top of OS stack. Else, fetch the
@@ -902,6 +956,7 @@ FPOPER:	LXI H,TEMP_OP                   ;Load L with address of TEMP OP storage 
 	LXI H,ARITH_STKPTR              ;Change L to address of ARff HMETIC STACK pointer
 	MOV A,M                         ;Fetch AS pointer value into ACC
 	MOV L,A                         ;Set L to top of ARITHMETIC STACK
+	MVI H,HIGH ARITH_STACK          ;Set H to arithmetic stack page (8080 fix)
 	CALL OPLOAD                     ;Transfer number from ARffHMETIC STACK to FPOP
 	LXI H,ARITH_STKPTR              ;Restore pointer to AS pointer
 	MOV A,M                         ;Fetch the pointer value to the ACC and subtract four
@@ -1023,10 +1078,10 @@ DVLOOP:	LXI H,FP_TEMP                   ;Load L with address of LSW of FP TEMP (
 	JNZ DVLOOP                      ;If counter not zero, continue exponentiation process
 	RET                             ;When have raised to proper power, return to caller.
 
-PRIGHT:	LXI H,FA_STKPTR                 ;Load HL with address of F/A STACK pointer
-	MOV A,M                         ;Fetch the pointer value into the ACC
+PRIGHT:	LDA FA_STKPTR                   ;Fetch the F/A stack pointer value
 	MOV C,A                         ;Save offset in C
 	MVI B,000H                      ;Clear B for 16-bit add
+	LXI H,FA_STACK-1                ;Load HL with FA_STACK base minus 1 (index starts at 1)
 	DAD B                           ;Add offset to base to point to top of F/A STACK
 	MOV A,M                         ;Fetch the contents of the top of the F/A STACK into
 	MVI M,000H                      ;The ACC then clear the top of the F/A STACK
@@ -1083,9 +1138,13 @@ FAERR:	XRA A                           ;Clear accumulator
 	JMP ERROR                       ;Go display the FA error message
 FUNAR4:	LXI H,SCAN_PTR                  ;Load HL with address of TEMP COUNTER
 	MOV B,M                         ;Load value in counter to register B. This is FUNCTION
-	LXI H,FA_STKPTR                 ;TOKEN VALUE. Cbange- L to F/A STACK pointer.
-	MOV C,M                         ;Fetch the F/A STACK pointer value into register C.
-	CALL INDEXC                     ;Form the address to the top of the F/A STACK.
+	LDA FA_STKPTR                   ;Fetch the F/A STACK pointer value into A
+	MOV C,A                         ;Move to C for 16-bit add
+	PUSH B                          ;Save function token in B
+	MVI B,000H                      ;Clear B for 16-bit add
+	LXI H,FA_STACK-1                ;Load HL with FA_STACK base minus 1 (index starts at 1)
+	DAD B                           ;Add offset to get FA_STACK[index-1]
+	POP B                           ;Restore function token
 	MOV M,B                         ;Store the FUNCTION TOKEN VALUE in the F/A
 	JMP CLESYM                      ;STACK. Then exit by clearing the SYMBOL BUFFER.
 TABADR:	MOV A,B                         ;Move the TEMP COUNTER value from B to ACC
@@ -1161,7 +1220,7 @@ TABLOP:	CALL ECHO                       ;Display space on output device
 	JNZ TABLOP                      ;If have not reached TAB position, continue to space
 	RET                             ;Else, return to calling routine.
 
-STOSYM:	LXI H,SYNTAX_PTR                ;Load HL with address of ARRAY FLAG
+STOSYM:	LXI H,ARRAY_FLAG                ;Load HL with address of ARRAY FLAG
 	MOV A,M                         ;Fetch the value of the ARRAY FLAG into the ACC
 	ANA A                           ;Check to see if the flag is set indicating processing an
 	JZ STOSY1                       ;Array variable value. Jump ahead if flag not set.
@@ -1281,6 +1340,7 @@ NOLIST:	LXI H,KW_RUN                    ;Load L with address of RUN in look up t
 	XRA A                           ;Clear accumulator
 	STA NUM_DIM_ARRAYS              ;@@ Init number of dimensioned arrays to zero
 	STA SYMBOL_BUF                  ;@@ Initialize 1st byte of array name table to zero.
+	STA ARRAY_FLAG                  ;Clear array/variable flag
 	LXI H,OP_STKPTR                 ;Set pointer to storage location for the first byte of the
 	MVI M,000H                      ;VARIABLES symbol table. Initialize it to zero too.
 	INX H                           ;Advance the pointer and zero the second location
@@ -1359,37 +1419,37 @@ GETAU1:	LXI H,SYNTAX_PTR                ;Reset memory pointer to line character 
 	INR B                           ;Fetch the pointer, increment it, and restore new value
 	MOV M,B
 	LXI H,USER_PGM_PTR              ;Set memory pointer to pgm buff line pntr storage loc
-	MOV C,M                         ;Bring the high order byte of this double byte pointer
+	MOV C,M                         ;Bring the low order byte of this double byte pointer
 	INX H                           ;Into CPU register C. Then advance the memory pntr
-	MOV L,M                         ;And bring the low order byte into register L. Now trans-
-	MOV H,C                         ;Fer the higher order portion into memory pointer H.
+	MOV H,M                         ;And bring the high order byte into register H. Now trans-
+	MOV L,C                         ;Fer the lower order portion into memory pointer L.
 	MOV A,M                         ;Obtain the char cntr (cc) which indicates the length of
 	DCR B                           ;The line being pointed to by the user program line pntr
 	CMP B                           ;Compare this with the value of the chars processed so
 	JNZ GETAU0                      ;Far in current line. If not equal, continue getting line n
 GETAU2:	LXI H,USER_PGM_PTR              ;Reset mem pntr to pgm buffer line pntr storage
-	MOV D,M                         ;Of this pointer into CPU register D
+	MOV E,M                         ;Load low order byte into CPU register E
 	INX H                           ;Advance the memory pointer, fetch the second
-	MOV L,M                         ;Byte of the pgm buffer line pointer into register L
-	MOV H,D                         ;Now make the memory pointer equal to this value
+	MOV H,M                         ;Byte (high order) of the pgm buffer line pointer into H
+	MOV L,E                         ;Now make the memory pointer equal to this value
 	MOV A,M                         ;Fetch the first byte of a line in the program buffer
 	ANA A                           ;Test to see if end of contents of pgm buff (zero byte)
 	JNZ NOTEND                      ;If not zero continue processing. If zero have reached
 	JMP NOSAME                      ;End of buffer contents so go APPEND line to buffer.
 PATCH3:	XRA A                           ; clear accumulator
-	STA SYNTAX_PTR                  ; clear A/V flag
+	STA ARRAY_FLAG                  ; clear A/V flag
 	JMP EXEC
 
 NOTEND:	LXI H,AUX_LINENUM               ;Load HL with addr of auxiliary line number storage loc
 	LXI D,LINENUM_BUF               ;Load DE with address of line number buffer location
 	CALL STRCP                      ;Compare line nr in input buffer with line number in
-	JM CONTIN                       ;User program buffer. If lesser in value keep looking.
-	JNZ NOSAME                      ;If greater in value then go to Insert line in pgm buffer
+	JM NOSAME                       ;User program buffer. If new < current, insert here.
+	JNZ CONTIN                      ;If new > current, keep looking for insertion point.
 	LXI H,USER_PGM_PTR              ;If same values then must remove the line with the same
-	MOV C,M                         ;The CPU memory pointer to point to the current
+	MOV C,M                         ;Load low order byte into C (Intel little-endian)
 	INX H                           ;Position in the user program buffer by retrieving that
-	MOV L,M                         ;Pointer from its storage location. Then obtain the first
-	MOV H,C                         ;Byte of data pointed to which will be the character
+	MOV H,M                         ;Load high order byte into H
+	MOV L,C                         ;Move low order byte into L
 	MOV B,M                         ;Count for that line (cc). Add one to the cc value to take
 	INR B                           ;Account of the (cc) byte itself and then remove that
 	CALL REMOVE                     ;Many bytes to effectively delete the line fm the user
@@ -1398,17 +1458,17 @@ NOTEND:	LXI H,AUX_LINENUM               ;Load HL with addr of auxiliary line num
 	ANA A                           ;Storage location. If it is zero then input buffer only
 	JZ EXEC                         ;Contains a line number. Action is a pure Delete.
 NOSAME:	LXI H,USER_PGM_PTR              ;Reset memory pointer to program buffer line pointer
-	MOV D,M                         ;Load high order byte into CPU register D
+	MOV E,M                         ;Load low order byte into CPU register E (Intel order)
 	INX H                           ;Advance memory pointer
-	MOV E,M                         ;Load low order byte into CPU register E
+	MOV D,M                         ;Load high order byte into CPU register D
 	LXI H,LINE_INP_BUF              ;Load L with address of start of line input buffer
 	MOV B,M                         ;Get length of line input buffer
 	INR B                           ;Advance length by one to include (cc) byte
 	CALL INSERT                     ;Go make room to insert line into user program buffer
 	LXI H,USER_PGM_PTR              ;Reset memory pointer to program buffer
-	MOV D,M                         ;Load higher byte into CPU register D
+	MOV E,M                         ;Load low order byte into CPU register E (Intel order)
 	INX H                           ;Advance memory pointer
-	MOV E,M                         ;Load low order byte into CPU register E
+	MOV D,M                         ;Load high order byte into CPU register D
 	LXI H,LINE_INP_BUF              ;Load L with address of start of line input buffer
 	CALL MOVEC                      ;Call subroutine to Insert line in input buffer into the
 	JMP EXEC1                       ;User program buffer then go back to start of EXEC.
@@ -1424,27 +1484,27 @@ MOVEPG:	MOV A,M                         ;Fetch character from line input buffer
 	JNZ MOVEPG                      ;If counter does not go to zero continue transfer ops
 	RET                             ;When counter equals zero return to calling routine
 CONTIN:	LXI H,USER_PGM_PTR              ;Reset memory pointer to program buffer
-	MOV D,M                         ;Load high order byte into CPU register D
+	MOV E,M                         ;Load low order byte into CPU register E (Intel order)
 	INX H                           ;Advance memory pointer
-	MOV E,M                         ;Load low order byte into CPU register E
+	MOV D,M                         ;Load high order byte into CPU register D
 	MOV H,D                         ;Now set CPU register H to high part of address
 	MOV L,E                         ;And set CPU register L to low part of address
 	MOV B,M                         ;Fetch the character counter (cc) byte fm line in
 	INR B                           ;Program buffer and add one to compensate for (cc)
 	CALL ADBDE                      ;Add length of line value to old value to get new pointer
 	LXI H,USER_PGM_PTR              ;Reset memory pointer to program buffer
-	MOV M,D                         ;Restore new high portion
+	MOV M,E                         ;Restore new low portion (Intel order)
 	INX H                           ;Advance memory pointer
-	MOV M,E                         ;And restore new low portion
+	MOV M,D                         ;And restore new high portion
 	JMP GETAUX                      ;Continue til find point at which to enter new line
 GETCHP:	MOV B,M                         ;HL already points to char index storage - fetch index
 	LXI H,USER_PGM_PTR              ;Reset pntr to pgm buffer line pointer storage location
-	MOV D,M                         ;Load high order byte into CPU register D
+	MOV E,M                         ;Load low order byte into CPU register E (Intel order)
 	INX H                           ;Advance memory pointer (16-bit)
-	MOV E,M                         ;Load low order byte into CPU register E
+	MOV D,M                         ;Load high order byte into CPU register D
 	CALL ADBDE                      ;Add pointer to pgm buffer pointer to obtain address of
 	MOV H,D                         ;Desired character. Place high part of new addr in H.
-	MOV L,E                         ;And low part of new address in E.
+	MOV L,E                         ;And low part of new address in L.
 	MOV A,M                         ;Fetch character from position in line in user pgm buffer
 	CPI 0A0H                        ;See if it is the ASCII code for space
 	RET                             ;Return to caller with flags set to indicate result
@@ -1458,26 +1518,27 @@ REMOVE:	CALL INDEXB                     ;Add (cc) plus one to addr of start of l
 	CALL ADV                        ;Otherwise add one to the present pointer value
 	JMP REMOVE                      ;And continue removing chamcters from the user pgm bf
 REMOV1:	LXI H,END_PGM_PTR               ;Load L with end of user pgm buffer pointer storage loc
-	MOV D,M                         ;Get page portion of end of pgm buffer address
-	INX H                           ;Advance memory pointer
-	MOV A,M                         ;And get low portion of end of pgm buffer address into
-	SUB B                           ;Accumulator then subtract displacement value in B
+	MOV A,M                         ;Get low portion of end of pgm buffer address (Intel order)
+	SUB B                           ;Subtract displacement value in B
 	MOV M,A                         ;Restore new low portion of end of pgm buffer address
 	RNC                             ;If subtract did not cause carry can return now
-	DCX H                           ;Otherwise decrement memory pointer back to page
-	DCR D                           ;Storage location, decrement page value to give new page
+	INX H                           ;Advance memory pointer to high byte
+	MOV D,M                         ;Get page portion of end of pgm buffer address
+	DCR D                           ;Decrement page value to give new page
 	MOV M,D                         ;And store new page value back in buffer pntr storage loc
 	RET                             ;Then return to calling routine
-INSERT:	LHLD END_PGM_PTR                ;Load HL with end of user pgm buffer pointer
+INSERT:	PUSH D                          ;Save insertion point (DE) on stack
+	LHLD END_PGM_PTR                ;Load HL with end of user pgm buffer pointer
 	CALL INDEXB                     ;Add (cc) of line in input buffer to form new end of
 	XCHG                            ;Program buffer address. Put new end in DE
 	LXI H,ARRAY_CODE                ;Load HL with limit address
 	MOV A,L                         ;Compare DE >= HL (new end >= limit)
 	SUB E                           ;Subtract low bytes
 	MOV A,H                         ;Subtract high bytes with borrow
-	SBB D                           ;If carry clear, DE >= HL (overflow!)
+	SBB D                           ;If carry set, DE > HL (overflow!)
 	XCHG                            ;Restore new end to HL
-	JNC BIGERR                      ;System capability exceeded - display error!
+	JC BIGERR                       ;System capability exceeded - display error!
+	POP D                           ;Restore insertion point to DE
 	CALL SUBHL                      ;Else restore original value of end of buffer address
 INSER1:	MOV C,M                         ;Bring byte pointed to by H & L into CPU register C
 	CALL INDEXB                     ;Add displacement value to current memory pointer
@@ -1492,13 +1553,13 @@ INCLIN:	LXI H,LINE_INP_BUF              ;Load L with start of line input buffer
 	MOV B,M                         ;Fetch length of the line in line input buffer
 	INR B                           ;Increment value by one to include (cc) byte
 	LXI H,END_PGM_PTR               ;Set memory pointer to end of user pgrn buffer pointer
-	MOV D,M                         ;Storage location on same page and fetch page address
-	INX H                           ;Of this pointer into D. Then advance memory pointer
-	MOV E,M                         ;And get low part of this pointer into CPU register E.
+	MOV E,M                         ;Get low part of this pointer into CPU register E (Intel order)
+	INX H                           ;Advance memory pointer
+	MOV D,M                         ;Fetch page address into D
 	CALL ADBDE                      ;Now add displacement (cc) of line in input buffer to
-	MOV M,E                         ;The end of program buffer pointer. Replace the updated
-	DCX H                           ;Low portion of the new pointer value back in stomge
-	MOV M,D                         ;And restore the new page value back into storage
+	MOV M,D                         ;The end of program buffer pointer. Replace the updated
+	DCX H                           ;High portion of the new pointer value back in storage
+	MOV M,E                         ;And restore the new low value back into storage
 	RET                             ;Then return to calling routine
 CPHLDE:	MOV A,H                         ;Subroutine to compare if the contents of CPU registers
 	CMP D                           ;H & L are equal to registers D & E. First compare
@@ -1572,18 +1633,18 @@ RUN:	XRA A                           ;Clear accumulator
 	SHLD USER_PGM_PTR               ;Initialize user program pointer to start of buffer
 	JMP SAMLIN                      ;Start executing user program with first line in buffer
 NXTLIN:	LXI H,USER_PGM_PTR              ;Load L with addr of user program buffer line pointer
-	MOV D,M                         ;Place page addr of pgm buffer line pointer in D
+	MOV E,M                         ;Place low addr of pgm buffer line pointer in E (Intel order)
 	INX H                           ;Advance the memory pointer
-	MOV E,M                         ;Place low addr of pgm buffer line pointer in E
+	MOV D,M                         ;Place page addr of pgm buffer line pointer in D
 	MOV H,D                         ;Also put page addr of pgm buffer line pointer in H
 	MOV L,E                         ;And low addr of pgm buffer line pointer in L
 	MOV B,M                         ;Now fetch the (cc) of current line into register B
 	INR B                           ;Add one to account for (cc) byte itself
 	CALL ADBDE                      ;Add value in B to D&E to point to next line in
 	LXI H,USER_PGM_PTR              ;User program buffer. Reset L to addr of user logrn
-	MOV M,D                         ;Updated user pgm line pointer in pointer storage
-	INX H                           ;Location. Store both the high portion
-	MOV M,E                         ;And low portion. (Now points to next line to be
+	MOV M,E                         ;Updated user pgm line pointer in pointer storage (Intel order)
+	INX H                           ;Location. Store both the low portion
+	MOV M,D                         ;And high portion. (Now points to next line to be
 	LXI H,LINENUM_BUF               ;Processed from user program buffer.) Change pointer
 	MOV A,M                         ;Line number (length) processed. Test to see if it was
 	ANA A                           ;Blank. If it was blank
@@ -1591,10 +1652,10 @@ NXTLIN:	LXI H,USER_PGM_PTR              ;Load L with addr of user program buffer
 	MOV A,A                         ;Insert two effective NOPs here
 	MOV A,A                         ;In case of patching
 SAMLIN:	LXI H,USER_PGM_PTR              ;Load L with addr of user program buffer line pointer
-	MOV C,M                         ;Fetch the high portion of the pointer into register C
+	MOV C,M                         ;Fetch the low portion of the pointer into register C (Intel order)
 	INX H                           ;Advance the memory pointer
-	MOV L,M                         ;Fetch the low portion of the pointer into register L
-	MOV H,C                         ;Now move the high portion into register H
+	MOV H,M                         ;Fetch the high portion of the pointer into register H
+	MOV L,C                         ;Now move the low portion into register L
 	LXI D,LINE_INP_BUF              ;Set E to address of start of line input buffer
 	CALL MOVEC                      ;Move the line ftom the user program buffer into the
 	LXI H,LINE_INP_BUF              ;Line input buffer. Now reset the pointer to the start
@@ -1865,10 +1926,10 @@ GOTO6:	LXI H,TEMP_ARRAY                ;Change L to the address of the GOTO SEAR
 	INR B                           ;Increment the GOTO SEARCH pointer
 	MOV M,B                         ;And restore it back to memory
 	LXI H,USER_PGM_PTR              ;Change L to address of user program buffer pointer
-	MOV C,M                         ;Save the high part of this pointer value in register C
-	INX H                           ;Advance L to the low part of the pgrn buffer pointer
-	MOV L,M                         ;Now load it into L
-	MOV H,C                         ;And transfer C into H to point to start of the line
+	MOV C,M                         ;Save the low part of this pointer value in register C (Intel order)
+	INX H                           ;Advance L to the high part of the pgrn buffer pointer
+	MOV H,M                         ;Now load high part into H
+	MOV L,C                         ;And transfer C into L to point to start of the line
 	MOV A,M                         ;Fetch the (cc) of the current line being pointed to in the
 	DCR B                           ;User pgm buff. Decrernent B to previous value. Compare
 	CMP B                           ;GOTO SEARCH pointer value to length of current line.
@@ -1878,24 +1939,24 @@ GOTO7:	LXI H,SYMBOL_BUF                ;Load HL with address of start of the SYM
 	CALL STRCP                      ;Compare GOTO line number against current line nr.
 	JZ SAMLIN                       ;If they match, found GOTO line. Pick up ops there!
 	LXI H,USER_PGM_PTR              ;Else, set L to user program buffer pntr storage location
-	MOV D,M                         ;Fetch the high part of this pointer into register D
+	MOV E,M                         ;Fetch the low part of this pointer into register E (Intel order)
 	INX H                           ;Advance the memory pointer
-	MOV E,M                         ;Fetch the low part into register E
+	MOV D,M                         ;Fetch the high part into register D
 	MOV H,D                         ;Transfer the pointer to H
 	MOV L,E                         ;And L. Fetch the (cc) of the current line into register
 	MOV B,M                         ;B and then add one to account for the (cc) byte to get
 	INR B                           ;Total length of the current line in the user pgm buffer
 	CALL ADBDE                      ;Add the total length to the pointer value in D & E
 	LXI H,USER_PGM_PTR              ;To get the starting address of the next line in the user
-	MOV M,D                         ;Program buffer pointer back into the user program
+	MOV M,E                         ;Program buffer pointer back into the user program (Intel order)
 	INX H                           ;Buffer pointer storage locations so that it points to the
-	MOV M,E                         ;Next line to be processed in the user program buffer.
+	MOV M,D                         ;Next line to be processed in the user program buffer.
 	LXI H,END_PGM_PTR               ;Load L with address of end of user pgm buffer storage
-	MOV A,D                         ;Location (page address) and fetch end of buffer page.
+	MOV A,E                         ;Fetch low portion (Intel order - low byte first)
 	CMP M                           ;Compare this with next line pointer (updated).
 	JNZ GOTO4                       ;If not end of buffer, keep looking for the specified line
-	INX H                           ;If have same page addresses, check the low address
-	MOV A,E                         ;Portions to see if
+	INX H                           ;If have same low addresses, check the high address
+	MOV A,D                         ;Portions to see if
 	CMP M                           ;Have reached end of user program buffer
 	JNZ GOTO4                       ;If not, continue looking. If end of buffer without
 GOTOER:	MVI A,0D5H                      ;Finding specified line, then have an error condition.
@@ -1972,9 +2033,9 @@ GOSUB:	LXI H,LINENUM_BUF               ;Load HL with start of LINE NUMBER BUFFER
 	DCR D                           ;And then decrementing the value in the register
 	JZ GOSUB1                       ;If no line number, then processing a DIRECT statement
 	LXI H,USER_PGM_PTR              ;Else, load L with address of user pgm buff line pointer
-	MOV D,M                         ;Fetch high value (page) of pgm line pointer to D
+	MOV E,M                         ;Fetch low value of pgm line pointer to E (Intel order)
 	INX H                           ;Advance the memory pointer
-	MOV E,M                         ;Fetch the low part of pgm line pointer to E
+	MOV D,M                         ;Fetch the high part (page) of pgm line pointer to D
 GOSUB1:	LXI H,GOSUB_STK_BASE            ;Set L to address of GOSUB STACK POINTER
 	MOV A,M                         ;Fetch value in GOSUB stack pointer to ACC
 	ADI 002H                        ;Add two to current stack pointer for new data to be
@@ -1983,10 +2044,10 @@ GOSUB1:	LXI H,GOSUB_STK_BASE            ;Set L to address of GOSUB STACK POINTER
 	MOV M,A                         ;Else, store updated stack pointer
 	LXI H,ARRAY_TEMP                ;Load L with address of start of stack less offset (2)
 	ADD L                           ;Add GOSUB stack pointer to base address
-	MOV L,A                         ;To get pointer to top of stack (page byte)
-	MOV M,D                         ;Store page part of pgm buffer line pointer in stack
+	MOV L,A                         ;To get pointer to top of stack (low byte)
+	MOV M,E                         ;Store low part of pgm buffer line pointer in stack (Intel order)
 	INX H                           ;Advance pointer to next byte in stack
-	MOV M,E                         ;Store low part of pgm buffer line pointer in stack
+	MOV M,D                         ;Store page part of pgm buffer line pointer in stack
 	JMP GOTO                        ;Proceed from here as though processing a GOTO
 RETURN:	LXI H,GOSUB_STK_BASE            ;Set L to address of GOSUB STACK POINTER
 	MOV A,M                         ;Fetch the value of GOSUB stack pointer to ACC
@@ -1996,17 +2057,17 @@ RETURN:	LXI H,GOSUB_STK_BASE            ;Set L to address of GOSUB STACK POINTER
 	ADI 002H                        ;Add two to point to previous top of stack
 	LXI H,ARRAY_TEMP                ;Load L with address of start of GOSUB stack less two
 	ADD L                           ;Add address of previous top of stack to base value
-	MOV L,A                         ;Set pointer to high address value in the stack
+	MOV L,A                         ;Set pointer to low address value in the stack
+	MOV E,M                         ;Fetch the low address value from stack to register E (Intel order)
+	INX H                           ;Advance pointer to get high address value from the stack
 	MOV D,M                         ;Fetch the high address value from stack to register D
 	INR D                           ;Exercise the register contents to see if high address
 	DCR D                           ;Obtained is zero. If so, original GOSUB statement was
 	JZ EXEC                         ;A DIRECT statement. Must return to Executive!
-	INX H                           ;Else, advance pointer to get low address value from the
-	MOV E,M                         ;Stack into CPU register E.
 	LXI H,USER_PGM_PTR              ;Load L with address of user pgm line pointer storage
-	MOV M,D                         ;Put high address from stack into pgm line pointer.
+	MOV M,E                         ;Put low address from stack into pgm line pointer (Intel order)
 	INX H                           ;Advance the memory pointer
-	MOV M,E                         ;Put low address from stack into pgrn line pointer.
+	MOV M,D                         ;Put high address from stack into pgrn line pointer.
 	JMP NXTLIN                      ;Execute the next line after originating GOSUB line!
 GOSERR:	MVI A,0C7H                      ;Load ASCII code for letter G into accumulator
 	MVI C,0D3H                      ;Load ASCII code for letter S into register C
@@ -2077,9 +2138,9 @@ FOR:	XRA A                           ;Clear accumulator
 	INR B                           ;Increment it in preparation for pushing operation
 	MOV M,B                         ;Restore it back to its storage location
 	LXI H,USER_PGM_PTR              ;Load HL with address of user pgm buffer line pointer
+	MOV E,M                         ;Fetch low address of pgm buffer line pntr into E (Intel order)
+	INX H                           ;Advance the memory pointer to pick up high part
 	MOV D,M                         ;Fetch page address of pgm buffer line pntr into D
-	INX H                           ;Advance the memory pointer to pick up low part
-	MOV E,M                         ;Fetch low address of pgm buffer line pntr into E
 	MOV A,B                         ;Restore updated FOR/NEXT STACK pointer to ACC
 	RLC                             ;Rotate it left to multiply by two, then rotate it again to
 	RLC                             ;Multiply by four to get offset into FOR/NEXT STACK
@@ -2087,9 +2148,9 @@ FOR:	XRA A                           ;Clear accumulator
 	MVI B,000H                      ;Clear B for 16-bit add
 	LXI H,FN_STACK                  ;Load HL with base of FOR/NEXT STACK
 	DAD B                           ;Add offset to get stack entry address
-	MOV M,D                         ;Store the page portion of the user pgm buffer line pntr
+	MOV M,E                         ;Store the low portion of the pgm line pntr on the stack (Intel order)
 	INX H                           ;Advance to next byte in FOR/NEXT STACK
-	MOV M,E                         ;Store the low portion of the pgm line pntr on the stack
+	MOV M,D                         ;Store the page portion of the user pgm buffer line pntr
 	LXI H,KW_TO                     ;Change L to point to start of TO string which is stored
 	CALL INSTR                      ;Search the statement line for the occurrence of TO
 	MOV A,E                         ;Register E wiU be zero if TO not found. Move E to ACC
@@ -2178,8 +2239,14 @@ FPZERO:	LXI H,FPACC_MSW                 ;Set L to point to MSW of FPACC
                                   ;label is the entry point when a number already in float-
                                   ;ing point fonnat is to be normalized.
 
-FPFLT:	MVI B,017H                      ;For fixed to float set CPU register B to 23 decimal
-FPNORM:	MOV A,B                         ;Get CPU register B into ACC to check for special case
+FPFLT:	MVI B,016H                      ;For fixed to float set CPU register B to 22 decimal
+	MVI A,001H                      ;Set flag to indicate FPFLT path (need EXP adjust)
+	STA FPFLT_FLAG                  ;Store flag
+	JMP FPNORM1                     ;Jump to common normalization code
+FPNORM:	XRA A                           ;Clear flag for regular normalization (no EXP adjust)
+	STA FPFLT_FLAG                  ;Store flag
+FPNORM1:
+	MOV A,B                         ;Get CPU register B into ACC to check for special case
 	LXI H,FPACC_EXP                 ;Set L to FPACC Exponent byte
 	ANA A                           ;Set CPU flags to test what was in CPU register B
 	JZ NOEXC0                       ;If B was zero then do standard normalization
@@ -2219,6 +2286,11 @@ ACNONZ:	LXI H,FPACC_LSW_M1              ;If FPACC has any value set pointer to L
 ACCSET:	LXI H,FPACC_MSW                 ;Set pntr to FPACC MSW. Now must provide room for
 	MVI B,003H                      ;Sign bit in nonnalized FPACC. Set precision counter.
 	CALL ROTATR                     ;Rotate the FPACC once to the right now.
+	LDA FPFLT_FLAG                  ;Check if this is FPFLT path
+	ANA A                           ;Test flag
+	JZ RESIGN                       ;Skip increment if FPNORM path (ADDEXP already +1)
+	LXI H,FPACC_EXP                 ;Point to exponent
+	INR M                           ;Increment exponent to compensate for right shift
 RESIGN:	LXI H,SIGN_IND1                 ;Set the pointer to SIGN indicator storage location
 	MOV A,M                         ;Fetch the original sign of the FPACC
 	ANA A                           ;Set CPU flags
@@ -2302,7 +2374,6 @@ SHACOP:	CALL PATCH1                     ; patch 1 initializes FP extension bytes
 	CALL SHLOOP                     ;Rotate FPACC mantissa RIGHT & Increment Exponent
 	LXI H,FPOP_EXP                  ;Change pointer to FPOP Exponent
 	CALL SHLOOP                     ;Rotate FPOP mantissa RIGHT & Increment Exponent
-	MOV D,H                         ;Rotate ops provide room for overflow. Now set up
 	LXI D,FPACC_LSW_M1              ;Pointers to LSW minus one for both FPACC & FPOP
 	MVI B,004H                      ;(FPOP already set after SHLOOP). Set precision counter
 	CALL ADDER                      ;Call quad precision ADDITION subroutine.
@@ -2357,6 +2428,9 @@ FPSUB:	LXI H,FPACC                     ;Set L to address of LSW of FPACC
 FPMULT:	CALL CKSIGN                     ;Call routine to set up registers & ck signs of numbers
 ADDEXP:	LXI H,FPOP_EXP                  ;Set pointer to FPOP Exponent
 	MOV A,M                         ;Fetch FPOP Exponent into the accumulator
+	MVI M,000H                      ;Clear FPOP_EXP for 6-byte extended add (byte 5)
+	INX H                           ;Point to FP_TEMP[0]
+	MVI M,000H                      ;Clear FP_TEMP[0] for 6-byte extended add (byte 6)
 	LXI H,FPACC_EXP                 ;Change pointer to FPACC Exponent
 	ADD M                           ;Add FPACC Exponent to FPOP Exponent
 	ADI 001H                        ;Add one more to total for algorithm compensation
@@ -2386,7 +2460,7 @@ MULTIP:	LXI H,FPACC_MSW                 ;Set pointer to MSW of FPACC mantissa
 	LXI H,FP_WORK_66                ;If have done 23 (decimal) bits, set pntr to p-p MSW
 	MVI B,006H                      ;Set precision counter (for double length)
 	CALL ROTATR                     ;Shift partial-product once more to the RIGHT
-	LXI H,FP_WORK_63                ;Set pointer to access 24'th bit in partial-product
+	LXI H,FP_WORK_61                ;Set pointer to access 24'th bit in partial-product
 	MOV A,M                         ;Fetch the byte containing the 24'th bit
 	RAL                             ;Position the 24'th bit to be MSB in the accumulator
 	ANA A                           ;Set the CPU flags after to rotate operation and test to
@@ -2394,7 +2468,7 @@ MULTIP:	LXI H,FPACC_MSW                 ;Set pointer to MSW of FPACC mantissa
 	LXI H,FPACC_LSW_M1              ;Now set up pointers
 	MOV E,L                         ;To perform transfer
 	MOV D,H                         ;Of the multiplication results
-	LXI H,FP_WORK_63                ;From the partial-product location
+	LXI H,FP_WORK_61                ;From the partial-product location
 	MVI B,004H                      ;To the FPACC
 
 
@@ -2464,8 +2538,7 @@ NEGFPA:	LXI H,MD_SIGNS                  ;Set pointer to M/D SIGNS indicator
                                   ;called on by the multiplication algorithm.
 
 ADOPPP:	LXI D,FP_WORK_61                ;Pointer to LSW of partial-product
-	MOV D,H                         ;On same page as FPOP
-	LXI H,FPOP_EXT_59               ;LSIV of FPOP which contains extended multiplicand
+	LXI H,FPOP_EXT_59               ;LSW of FPOP which contains extended multiplicand
 	MVI B,006H                      ;Set precision counter (double length working registers)
 	JMP ADDER                       ;Add multiplicand to partial-product & return to caller
 
@@ -2494,13 +2567,20 @@ SUBEXP:	LXI H,FPOP_EXP                  ;Set pointer to FPOP (dividend) Exponent
 	MOV M,A                         ;Place result in FPACC Exponent
 SETDCT:	LXI H,BITS_COUNTER              ;Set pointer to bit counter storage location
 	MVI M,017H                      ;Initialize bit counter to 23 decimal
+	LXI H,AUX_SYMBOL_BUF            ;Clear quotient register before division
+	XRA A                           ;Clear accumulator
+	MOV M,A                         ;Clear LSW of quotient
+	INX H
+	MOV M,A                         ;Clear NSW of quotient
+	INX H
+	MOV M,A                         ;Clear MSW of quotient
 
                                   ;Main division algorithm for mantissas
 
-DIVIDE:	CALL SETSUB                     ;Go subtmct divisor from dividend
+DIVIDE:	CALL SETSUB                     ;Go subtract divisor from dividend
 	JM NOGO                         ;If result is negative then place a zero bit in quotient
 	LXI D,FPOP                      ;If result zero or positive then move remainder after
-	LXI H,FPOP_EXT_59               ;Subtraction from working area to become new dividend
+	LXI H,DIV_WORK                  ;Subtraction from working area to become new dividend
 	MVI B,003H                      ;Set up moving pointers and initialize precision counter
 	CALL MOVEIT                     ;Perform the transfer
 	MVI A,001H                      ;Place a one into least significant bit of accumulator
@@ -2539,21 +2619,26 @@ QUOROT:	LXI H,AUX_SYMBOL_BUF            ;Set up pointer to LSW of quotient regis
 	MOV B,M                         ;Fetch FPACC exponent
 	INR B                           ;Increment the value to compensate for the rotate right
 	MOV M,B                         ;Restore the updated exponent value
-DVEXIT:	LXI H,FP_WORK_63                ;Set up pointers
-	LXI D,FPACC_LSW_M1              ;To transfer the quotient into the FPACC
-	MVI B,004H                      ;Set precision counter
-                                  ;THIS IS A CORRECTION FOUND IN THE NOTES
-	JMP EXMLDV                      ;And exit through FPMULT routine at EXMLDV
+DVEXIT:	LXI H,AUX_SYMBOL_BUF            ;Set up pointers to quotient
+	LXI D,FPACC                     ;To transfer the quotient into the FPACC
+	MVI B,003H                      ;Set precision counter (3 bytes for mantissa)
+	CALL MOVEIT                     ;Perform the transfer
+	MVI B,000H                      ;Set up CPU register B to indicate regular normalization
+	CALL FPNORM                     ;Normalize the result of division
+	LXI H,MD_SIGNS                  ;Now set the pointer to the original SIGNS indicator
+	MOV A,M                         ;Fetch the indicator
+	ANA A                           ;Exercise the CPU flags
+	RNZ                             ;If indicator is non-zero, answer is positive, can exit here
+	JMP FPCOMP                      ;If not, answer must be negated, exit via 2's complement
 
                                   ;Subroutine to subtract divisor from dividend. Used by
                                   ;main DIVIDE subroutine.
 
-SETSUB:	LXI D,FPOP_EXT_59               ;Set pointer to LSW of working area
-	MOV D,H                         ;On same page as FPACC
+SETSUB:	LXI D,DIV_WORK                  ;Set pointer to LSW of working area (was FPOP_EXT_59)
 	LXI H,FPACC                     ;Set pointer to LSW of FPACC (divisor)
 	MVI B,003H                      ;Set precision counter
 	CALL MOVEIT                     ;Perform transfer
-	LXI D,FPOP_EXT_59               ;Reset pointer to LSW of working area (now divisor)
+	LXI D,DIV_WORK                  ;Reset pointer to LSW of working area (now divisor)
 	LXI H,FPOP                      ;Reset pointer to LSW of FPOP (dividend)
 	MVI B,003H                      ;Set precision counter
 	CALL SUBBER                     ;Subtract divisor from dividend
@@ -2850,11 +2935,10 @@ ENDINP:	LXI H,SIGN_IND2                 ;Set pointer to mantissa SIGN indicator
 	LXI H,FP_WORK_6C                ;But, if indicator is non-zero, number is negative
 	MVI B,003H                      ;Set pntr to LSW of storage registers, set precision entr
 	CALL COMPLM                     ;Negate the triple-precision number in holding registers
-FININP:	LXI H,FP_WORK_6B                ;Set pointer to input storage LS~V minus one
+FININP:	LXI H,FP_WORK_6B                ;Set pointer to input storage LSW minus one
 	XRA A                           ;Clear the accumulator
 	MOV M,A                         ;Clear the LSW minus one location
-	MOV D,H                         ;Set register D to floating point working page
-	LXI D,FPACC_LSW_M1              ;Set E to address of FPACC LSW minus one
+	LXI D,FPACC_LSW_M1              ;Set DE to address of FPACC LSW minus one
 	MVI B,004H                      ;Set precision counter
 	CALL MOVEIT                     ;Move number from input register to FPACC
 	CALL FPFLT                      ;Now convert the binary fixed point to floating point
@@ -2921,7 +3005,6 @@ DECBIN:	CALL SAVEHL                     ;Save entry value of D, E, H and L in me
 	MOV M,A                         ;Store temporarily
 	LXI D,FP_WORK_68                ;Set pointer to working area LSW of multi-byte register
 	LXI H,FP_WORK_6C                ;Set another pointer to LSW of conversion register
-	MOV D,H                         ;Make sure D set to page of working area
 	MVI B,003H                      ;Set precision counter
 	CALL MOVEIT                     ;Move original value of conversion register to working
 	LXI H,FP_WORK_6C                ;Register. Reset pointer to LSW of conversion register.
@@ -3020,8 +3103,7 @@ DECEXD:	LXI H,FP_CONST_0P1              ;If exponent is positive, multiply FPACC
                                   ;in the FPACC (after the decimal exponent equivalent has
                                   ;been extracted from the original value if required by the
                                   ;previous routines) to a string of decirnal digits.
-DECOUT:	MVI E,074H                      ;Set pointer to LSW of output working register
-	MOV D,H                         ;Set D to same page value as H
+DECOUT:	LXI D,FP_WORK_74                ;Set pointer to LSW of output working register
 	LXI H,FPACC                     ;Set pointer to LSW of FPACC
 	MVI B,003H                      ;Set precision counter
 	CALL MOVEIT                     ;Move value in FPACC to output working register
@@ -3118,8 +3200,7 @@ ZERODG:	LXI H,FP_WORK_6F                ;If first digit of floating point number
 OUTX10:	XRA A                           ;Clear accumulator
 	STA FP_WORK_77                  ;Clear MSW+1 in preparation for receiving next digit
 	LXI H,FP_WORK_74                ;Set pointer to working register LSW.
-	MOV D,H                         ;Set up register D to same page as H.
-	MVI E,070H                      ;Set second pointer to LSW of second working register
+	LXI D,FP_WORK_70                ;Set second pointer to LSW of second working register
 	MVI B,004H                      ;Set precision counter
 	CALL MOVEIT                     ;Move first working register into second
 	LXI H,FP_WORK_74                ;Reset pointer to LSW of first working register
@@ -3129,7 +3210,7 @@ OUTX10:	XRA A                           ;Clear accumulator
 	MVI B,004H                      ;Reset precision counter
 	CALL ROTATL                     ;Rotate contents left again (X 4)
 	LXI H,FP_WORK_70                ;Set pointer to LSW of original value in 2'nd register
-	MVI E,074H                      ;Set pointer to LSW of rotated value
+	LXI D,FP_WORK_74                ;Set pointer to LSW of rotated value
 	MVI B,004H                      ;Set precision counter
 	CALL ADDER                      ;Add rotated value to original value (X 5)
 	LXI H,FP_WORK_74                ;Reset pointer to LSW of first working register
@@ -3230,6 +3311,7 @@ FA_STACK:                               ; Function/array stack (7 bytes)
 
 ;; HEIRARCHY TABLE (FOR OUT OF STACK OPS)
 ;; USED BY PARSER ROUTINE.
+HIER_OUT_TBL:                           ; Label for hierarchy OUT table
 	DB	000H                    ; EOS
 	DB	003H                    ; PLUS SIGN
 	DB	003H                    ; MINUS SIGN
@@ -3248,6 +3330,7 @@ FA_STACK:                               ; Function/array stack (7 bytes)
 
 ;; HEIRARCHY TABLE (FOR INTO STACK OPS)
 ;; USED BY PARSER ROUTINE.
+HIER_IN_TBL:                            ; Label for hierarchy IN table
 	DB	000H                    ; EOS
 	DB	003H                    ; PLUS SIGN
 	DB	003H                    ; MINUS SIGN
@@ -3269,8 +3352,11 @@ EVAL_PTR:                               ; EVAL pointer
 EVAL_FINISH:                            ; EVAL finish pointer
 	DB	000H                    ; EVAL FINISH POINTER
 
-FUNC_TBL:                               ; Function names table
-;; FUNCTION NAMES TABLE
+FUNC_TBL:                               ; Function names table (TABADR adds B*4, B starts at 1)
+;; Padding entry (4 bytes) - TABADR uses offset B*4 where B starts at 1
+	DB	000H                    ; Dummy (cc) = 0
+	DB	000H,000H,000H          ; 3 dummy bytes
+;; FUNCTION NAMES TABLE - Entry 1 at offset 4
 	DB	003H
 	DB	"INT"
 	DB	003H
@@ -3298,15 +3384,15 @@ AUX_LINENUM:                            ; Auxiliary line number buffer
 ;;; which apparently makes the "INSERT" command work correctly, the
 ;;; first time (later SCR commands load 33 into this spot)
 USER_PGM_PTR:                           ; User program line pointer
-	DB	01BH                    ; USER PGM LINE PTR (PG)
-	DB	000H                    ; USER PGM LINE PTR (LOW)
+	DB	000H                    ; USER PGM LINE PTR (LOW) - Intel order
+	DB	01BH                    ; USER PGM LINE PTR (PG/HIGH)
 AUX_PGM_PTR:                            ; Aux program line pointer
-	DB	000H                    ; AUX PGM LINE PTR (PG)
 TEMP_F3:                                ; Alias for AUX_PGM_PTR low byte
-	DB	000H                    ; AUX PGM LINE PTR (LOW)
+	DB	000H                    ; AUX PGM LINE PTR (LOW) - Intel order
+	DB	000H                    ; AUX PGM LINE PTR (PG/HIGH)
 END_PGM_PTR:                            ; End of user program buffer ptr
-	DB	000H                    ; END OF USER PGM BUFFER PTR (PG)
-	DB	000H                    ; END OF USER PGM BUFFER PTR (LOW)
+	DB	000H                    ; END OF USER PGM BUFFER PTR (LOW) - Intel order
+	DB	000H                    ; END OF USER PGM BUFFER PTR (PG/HIGH)
 PAREN_CNT:                              ; Parenthesis counter
 	DB	000H                    ; PARENTHESIS COUNTER (366)
 QUOTE_IND:                              ; Quote indicator
@@ -3445,13 +3531,13 @@ FORNXT:	MVI A,0C6H                      ;Load ACC with ASCII code for letter F
 	MVI C,0CEH                      ;Load register C with ASCII code for letter N
 	JMP ERROR                       ;Display For/Next (FN) error message if required
 NEXT4:	LXI H,USER_PGM_PTR              ;Load L with address of user program line pointer
-	MOV D,M                         ;Fetch the page portion of the line pointer into D
+	MOV E,M                         ;Fetch the low portion of the line pointer into E (Intel order)
 	INX H                           ;Advance the memory pointer
-	MOV E,M                         ;Fetch the low portion of the line pointer into E
+	MOV D,M                         ;Fetch the page portion of the line pointer into D
 	INX H                           ;Advance pntr to AUXILIARY LINE POINTER storage
-	MOV M,D                         ;Location and store value of line pointer there too (page)
+	MOV M,E                         ;Location and store value of line pointer there too (low) (Intel order)
 	INX H                           ;Advance pointer to second byte of AUXILIARY line
-	MOV M,E                         ;Pointer and store value of line pointer (low portion)
+	MOV M,D                         ;Pointer and store value of line pointer (page portion)
 	LXI H,TEMP_085                  ;Load HL with address of FOR/NEXT STACK pointer
 	MOV A,M                         ;Fetch the FOR/NEXT STACK pointer value to ACC
 	RLC                             ;Rotate value left to multiply by two. Then rotate it
@@ -3460,13 +3546,13 @@ NEXT4:	LXI H,USER_PGM_PTR              ;Load L with address of user program line
 	MVI B,000H                      ;Clear B for 16-bit add
 	LXI H,FN_STACK                  ;Load HL with base of FOR/NEXT STACK
 	DAD B                           ;Add offset to point to top of stack entry
-	MOV D,M                         ;Fetch page address of the associated FOR line pointer
+	MOV E,M                         ;Fetch low address of the associated FOR line pointer (Intel order)
 	INX H                           ;Advance the pointer
-	MOV E,M                         ;Fetch the low address value into E
+	MOV D,M                         ;Fetch the page address value into D
 	LXI H,USER_PGM_PTR              ;Program line pointer to the FOR statement line by
-	MOV M,D                         ;Place the page value in the pointer storage location
+	MOV M,E                         ;Place the low value in the pointer storage location (Intel order)
 	INX H                           ;Advance the memory pointer
-	MOV M,E                         ;Place the low value in the pointer storage location
+	MOV M,D                         ;Place the page value in the pointer storage location
 	MOV H,D                         ;Now set up H and L to point to the start of the
 	MOV L,E                         ;Associated FOR statement line in the user pgm buffer
 	LXI D,LINE_INP_BUF              ;And set L to the gtart of the line input buffer
@@ -3566,13 +3652,13 @@ NEXT9:	LXI H,SCAN_PTR                  ;Load L with address of SCAN pointer
 	ANA A                           ;Test the contents of the MSW of the FPACC
 	JM NEXT12                       ;Continue FORINEXT loop if current variable value is
 	JZ NEXT12                       ;Less than or equal to the F/N LIMIT value
-NEXT10:	LXI H,AUX_PGM_PTR+1             ;If out of LIMIT range, load HL with addr of the AUX
-	MOV E,M                         ;PGM LINE pointer low byte. Fetch low part into E
-	DCX H                           ;Decrement to AUX PGM LINE pointer high byte
+NEXT10:	LXI H,AUX_PGM_PTR               ;If out of LIMIT range, load HL with addr of the AUX
+	MOV E,M                         ;PGM LINE pointer low byte. Fetch low part into E (Intel order)
+	INX H                           ;Increment to AUX PGM LINE pointer high byte
 	MOV D,M                         ;Fetch the page part into D
-	DCX H                           ;Decrement to USER PGM PTR low byte
-	MOV M,E                         ;Copy AUX low byte to USER low byte
-	DCX H                           ;Decrement to USER PGM PTR high byte
+	LXI H,USER_PGM_PTR              ;Point to USER PGM PTR
+	MOV M,E                         ;Copy AUX low byte to USER low byte (Intel order)
+	INX H                           ;Increment to USER PGM PTR high byte
 	MOV M,D                         ;Copy AUX high byte to USER high byte
 	LXI H,TEMP_085                  ;Set HL to address of FOR/NEXT STACK pointer
 	MOV B,M                         ;Fetch and decrement the
@@ -3629,7 +3715,7 @@ PARSEP:	XRA A                           ;Clear accumulator to indicate end of ex
 	CALL PARSER                     ;PARSER subroutine for final time for the expression.
 	LXI H,ARITH_STKPTR              ;Change L to point to the ARITH STACK pointer.
 	MOV A,M                         ;Fetch the ARITH STACK pointer value.
-	CPI 098H                        ;Should indicate only one value (answer) in stack.
+	CPI LOW ARITH_STACK             ;Should indicate only one value (answer) in stack.
 	RZ                              ;Exit with answer in FPACC if ARITH STACK is O.K.
 	JMP SYNERR                      ;Else have a syntax error!
 
@@ -3667,9 +3753,8 @@ NOREMD:	XRA A                           ;Clear the accumulator
 	MOV B,A                         ;Form two's complement and save the result in register B
 SQREXP:	LXI H,EXP_COUNTER               ;Load L with address of TEMP register
 	MOV M,B                         ;Store Fxponent quotient from above ops in TEMP
-	LXI H,FP_CONST_1                ;Load L with address of FP registers containing +1.0
-	MVI E,01CH                      ;Load E with address of SQR APPROX working registers
-	MOV D,H                         ;Set D to same page as H
+	LXI H,FP_CONST_1                ;Load H with address of FP registers containing +1.0
+	LXI D,FPACC_SAVE                ;Load DE with address of SQR APPROX working registers
 	MVI B,004H                      ;Set up register B as a number of bytes to move counter
 	CALL MOVEIT                     ;Transfer value +1.0 into SQR APPROX registers
 	CALL CFALSE                     ;Now clear the FPACC registers
@@ -3704,9 +3789,8 @@ SQRLOP:	LXI H,FPACC_SAVE                ;Load L with address of SQR APPROX worki
 ;;;;           LAM
 ;;;;           NDA
 ;;;;           JTZ SQRCNV             ;THIS IS PATCH #2
-SQR1:	LXI H,FPACC_SAVE                ;Else, load L with address of SQR APPROX
-	MOV D,H                         ;Set D to same page as H
-	MVI E,024H                      ;And E with address of LAST SQR APPROX
+SQR1:	LXI H,FPACC_SAVE                ;Else, load H with address of SQR APPROX
+	LXI D,COL_024                   ;And DE with address of LAST SQR APPROX
 	MVI B,004H                      ;Set up register B as a number of bytes to move counter
 	CALL MOVEIT                     ;Transfer SQR APPROX into LAST SQR APPROX
 	JMP SQRLOP                      ;Continue ops until approximation converges
@@ -3776,6 +3860,7 @@ PATCH2:	JM SQRCNV
 ;;; =========================================================================
 
 USER_PROG_BUF:                          ; Start of user BASIC program buffer
+	DS	1024                    ; Reserve 1KB for BASIC program storage
 
 ;;; =========================================================================
 ;;; Array Routines - Optional DIM/array handling code
@@ -3908,7 +3993,7 @@ ARRAY7:	CALL EVAL                       ;Call subroutine to evaluate subscript e
 	ADD C                           ;In the ARRAY VALUES table). Add in base address to
 	LXI H,TEMP_ARRAY             ;The calculated value to form final address in the
 	MOV M,A                         ;ARRAY ELEMENT storage location & store the addr.
-	LXI H,SYNTAX_PTR                ;Change L to point to ARRAY FLAG
+	LXI H,ARRAY_FLAG                ;Change L to point to ARRAY FLAG
 	MVI M,0FFH                      ;Set the ARRAY FLAG for future use
 	RET                             ;Exit to calling routine
 

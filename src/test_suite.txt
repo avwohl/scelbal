@@ -1,0 +1,133 @@
+; SCELBAL Comprehensive Test Suite
+; Run with: cpmemu scelbal.cfg < test_suite.txt
+;
+; Expected results shown in comments
+
+SCR
+; ========== BASIC ARITHMETIC ==========
+PRINT 4
+; Expected: 4.0
+PRINT 8/2
+; Expected: 4.0
+PRINT 6/2
+; Expected: 3.0
+PRINT 10/5
+; Expected: 2.0
+PRINT 7/3
+; Expected: 2.333333
+PRINT 2*3
+; Expected: 6.0
+PRINT 5+7
+; Expected: 12.0
+PRINT 10-3
+; Expected: 7.0
+PRINT 1+2*3
+; Expected: 7.0 (tests precedence)
+
+; ========== NEGATIVE NUMBERS ==========
+PRINT -5
+; Expected: -5.0
+PRINT 3-7
+; Expected: -4.0
+PRINT -2*3
+; Expected: -6.0
+
+; ========== DECIMAL NUMBERS ==========
+PRINT 3.14159
+; Expected: 3.141592
+PRINT 0.5
+; Expected: 0.5
+PRINT 1.5*2
+; Expected: 3.0
+
+; ========== VARIABLES ==========
+LET A=5
+PRINT A
+; Expected: 5.0
+LET B=A*2
+PRINT B
+; Expected: 10.0
+A=7
+PRINT A
+; Expected: 7.0
+
+; ========== BUILT-IN FUNCTIONS ==========
+PRINT INT(3.7)
+; Expected: 3.0
+PRINT ABS(-5)
+; Expected: 5.0
+PRINT SGN(-5)
+; Expected: -1.0
+PRINT SGN(5)
+; Expected: 1.0
+PRINT SQR(4)
+; Expected: 2.0
+PRINT SQR(9)
+; Expected: 3.0
+
+; ========== COMPARISON OPERATORS ==========
+PRINT 5>3
+; Expected: 1.0 (true)
+PRINT 3>5
+; Expected: 0.0 (false)
+PRINT 5=5
+; Expected: 1.0 (true)
+
+; ========== SIMPLE PROGRAM ==========
+10 PRINT 42
+20 END
+LIST
+RUN
+; Expected: LIST shows program, RUN prints 42
+
+; ========== FOR/NEXT LOOP ==========
+SCR
+10 FOR I=1 TO 3
+20 PRINT I
+30 NEXT I
+40 END
+RUN
+; Expected: 1.0, 2.0, 3.0
+
+; ========== GOTO ==========
+SCR
+10 PRINT 1
+20 GOTO 40
+30 PRINT 2
+40 PRINT 3
+50 END
+RUN
+; Expected: 1.0, 3.0 (skips 2)
+
+; ========== IF/THEN ==========
+SCR
+10 LET X=5
+20 IF X>3 THEN PRINT 1
+30 IF X<3 THEN PRINT 0
+40 END
+RUN
+; Expected: 1.0 (only first condition is true)
+
+; ========== GOSUB/RETURN ==========
+SCR
+10 GOSUB 100
+20 PRINT 2
+30 END
+100 PRINT 1
+110 RETURN
+RUN
+; Expected: 1.0, 2.0
+
+; ========== ARRAYS ==========
+SCR
+10 DIM A(5)
+20 A(1)=10
+30 A(2)=20
+40 PRINT A(1)
+50 PRINT A(2)
+60 PRINT A(1)+A(2)
+70 END
+RUN
+; Expected: 10.0, 20.0, 30.0
+
+; ========== END OF TESTS ==========
