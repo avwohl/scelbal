@@ -1,0 +1,27 @@
+use gh to create private repository named scelbal in my personal git space (avwohl) for
+this project
+
+For this project translate in/sc1fast.asm to 8080 mnewmonics. As a first phase.
+When done adapt it to run under the CP/M os (repalce characgter in/out and csave/load).
+
+In the late 1970s the programming language scelbal was sold in book form. A corrected
+OCR pdf of the book. https://www.willegal.net/scelbi/SCELBAL_fixed.pdf . The book
+version was very slow.  An updated software release is what we have here that is faster.
+So most of the book is accurate but some of parsing is updated.
+
+For a table of 8008 opcodes oto map to 8080 see in/08_80/08_80_table.txt.  Also the
+other files in that directory.
+
+After BITOUT: is  a table of data.  The comments say what the data is.  Make
+up names for each variable/constant.  Use the names in the 8080 version. I suggest
+making up a crib sheet mapping addresses to names you make up.  If you can't tell
+from the comments in data then work the other way and read comments in the
+code as to what data is being used.
+
+For this version translate to 8080 exactly, as in it would IN and OUT for character io. In a later phase we will get it running under CP/M
+
+The target assembler is um80, see ~/src/um80. It is installed in the path.
+
+A copy of the intel 8008 processor manual is in docs/external.  Web posts over the
+years claim it has errors.  I don't know of any erratta sheets to say what they
+are. Maybe google multiple sources if needed.

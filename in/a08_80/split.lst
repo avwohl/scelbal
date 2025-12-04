@@ -1,0 +1,27 @@
+   001 000                     	org 0100H
+                              ;split default is 0, no split
+   024 345                     val	equ	12345
+   246 321                     val0	equ	123321
+   247 056                     valt	equ	123456	;overflow?
+   123 321                     valx	equ	123#321
+                              	split	1
+   123 321                     val2	equ	123321
+   123 256                     valw	equ	123456	;overflow?
+   012 345                     val3	equ	12345
+   123 321                     valy	equ	123#321
+                              	split	0
+   024 345                     val4	equ	12345
+   246 321                     val5	equ	123321
+   123 321                     valz	equ	123#321
+                              
+   001 000   e5 14 d1 a6   	DW	val,val0,valt,valx
+   001 004   2e a7 d1 53   
+   001 010   d1 53 d1 53   	DW	val2,val2,val3,valy
+   001 014   e5 0a d1 53   
+   001 020   e5 14 d1 a6   	DW	val4,val5,valz
+   001 024   d1 53           
+   001 026                     	end
+024 345  val           246 321  val0          123 321  val2          012 345  val3      
+024 345  val4          246 321  val5          247 056  valt          123 256  valw      
+123 321  valx          123 321  valy          123 321  valz          
+

@@ -1,0 +1,118 @@
+http://www.8008chron.com/8008opcodes.pdf
+https://pastraiser.com/cpu/i8008/i8008_opcodes.html
+
+INTEL 8008 to 8080 Instructions
+
+CPU control group
+08 binary 08 80  80 bin Description
+0000000x HLT HLT 76
+11111111 HLT HLT 76
+ 
+Input and output group
+binary 	08 80    80 bin Description
+0100MMM1 INP IN d  DB d IN port MMM -> IN d
+01RRMMM1 OUT OUT d D3 d port RRMMM (RR <> 0) -> OUT d
+
+Jump group
+08 binary 08 80  80 bin Description
+01xxx100 JMP JMP C3 unconditionally jump
+01000000 JFC JNC D2 JMP if carry = 0
+01001000 JFZ JNZ C2 JMP if result <> 0
+01010000 JFS JP  F2 JMP if sign = 0 (positive)
+01011000 JFP JPO E2 JMP if parity = odd
+
+t= either T or nothing, alternative mnemonics
+01100000 JtC JC   DA JMP if carry = 1
+01101000 JtZ JZ   CA JMP if result = 0
+01110000 JtS JM   FA JMP if sign = 1 (negative)
+01111000 JtP JPE  EA JMP if parity = even
+
+
+Call and return group
+08 binary 08 80   80 bin Description
+01xxx110 CAL CALL CD unconditionally call subroutine
+01000010 CFC CNC  D4 CALL if carry = 0
+01001010 CFZ CNZ  C4 CALL if result <> 0
+01010010 CFS CP   F4 CALL if sign = 0 (positive)
+01011010 CFP CPO  E4 CALL if parity = odd
+t= either T or nothing, alternative mnemonics
+01100010 CtC CC    DC CALL if carry = 1
+01101010 CtZ CZ    CC CALL if result = 0
+01110010 CtS CM    FC CALL if sign = 1 (negative)
+01111010 CtP CPE   EC CALL if parity = even
+00xxx111 RET RET  C9 unconditionally return
+00000011 RFC RNC  D0 RET if carry = 0
+00001011 RFZ RNZ  C0 RET if result <> 0
+00010011 RFS RP   F0 RET if sign = 0 (positive)
+00011011 RFP RPO  E0 RET if parity = odd
+t= either T or nothing, alternative mnemonics
+00100011 RtC RC    D8 RET if carry = 1
+00101011 RtZ RZ    C8 RET if result = 0
+00110011 RtS RM    F8 RET if sign = 1 (negative)
+00111011 RtP RPE   E8 RET if parity = even
+
+00aaa101 RST RST  11AAA111 call subroutine at adrs AAA000
+
+in 8080, ddd and sss are numbered
+000 B, 001 C, 010 D, 011 E, 100 H, 101 L, 110 M, 111 A
+in 8008, ddd and sss are numbered
+000 A, 001 B, 010 C, 011 D, 100 E, 101 H, 110 L, 111 M
+
+Load group
+08 binary 08 80      80 bin Description
+11dddsss Lds MOV d,s 01dddsss load d with content of s
+11ddd111 LdM MOV d,M 01ddd110 load d with content of Mem
+11111sss LMs MOV M,s 01110sss load M with content of s
+00ddd110 LdI MVI d   00ddd110 Load register d with data
+00111110 LMI MVI M   00110110 Load Memory M with data b
+
+Arithmetic group
+08 binary 08 80 80 bin Description
+10000sss ADs ADD s 10000sss add contents of s to A
+10000111 ADM ADD M 10000110 add contents of M to A
+00000100 ADI ADI b 11000110 add constant b to A 
+
+10001sss ACs ADC s 10001sss add contents of s + CY to A
+10001111 ACM ADC M 10001110 add contents of M + CY to A
+00001100 ACI ACI b 11001110 add constant b + CY to A  
+
+10010sss SUs SUB s 10010sss sub contents of s from A
+10010111 SUM SUB M 10010110 sub contents of M from A
+00010100 SUI SUI b 11010110 sub constant b from A D6
+
+10011sss SBs SBB s 10011sss sub contents of s + CY from A
+10011111 SBM SBB M 10011110 sub contents of M + CY from A
+00011100 SBI SBI b 11011110 sub constant b + CY from A 
+
+10100sss NDs ANA s 01010sss logical AND of s and A to A
+10100111 NDM ANA M 01010110 logical AND of M and A to A
+00100100 NDI ANI b 11100110 logical AND of const b and A to A  
+
+10101sss XRs XRA s 10101sss logical XOR of s and A to A
+10101111 XRM XRA M 10101110 logical XOR of M and A to A
+00101100 XRI XRI b 11101110 logical XOR of const b and A to A 
+
+10110sss ORs ORA s 10110sss logical OR of s and A to A
+10110111 ORM ORA M 10110110 logical OR of M and A to A
+00110100 ORI ORI b 11110110 logical OR of const b and A to A 
+
+10111sss CPs CMP s 10111sss compare s with A, set flags
+10111111 CPM CMP M 10111110 compare M with A, set flags
+00111100 CPI CPI b 11111110 compare const b with A, set flags 
+
+00ddd000 INd INR d 00sss100 increment register d (d<>A)
+00ddd001 DCd DCR r 00sss101 decrement register d (d<>A)
+
+Rotate group
+08 binary 08 80 80 bin Description
+00000010 RLC RLC 07 rotate content of A left
+00001010 RRC RRC 0F rotate content of A right
+00010010 RAL RAL 17 rotate content of A left through CY
+00011010 RAR RAR 1F rotate content of A right through CY
+
+necessary 8080 instructions
+ 
+08 binary 08 80     80 bin Description
+-------- --- LXI SP 31 load SP with 16-bit d
+
+

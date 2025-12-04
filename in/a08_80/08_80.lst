@@ -1,0 +1,266 @@
+                              ;https://pastraiser.com/cpu/i8008/i8008_opcodes.html
+                              ;https://www.youtube.com/watch?v=sOpMrVnjYeY
+                              ;intel 8008 mnemonics for 1972 --> 8080 opcode assembler
+                              ;assembled in code order
+                              
+   000 000                     	org	0000H
+   020 000                     a16	equ	1000H
+   000 125                     d8	equ	55H
+                              
+                              ;opcodes 00-0F
+   000 000   00               	NOP 
+   000 001   04               	INB 
+   000 002   05               	DCB 
+   000 003   06 55           	LBI d8
+   000 005   07               	RLC 
+   000 006   0c               	INC 
+   000 007   0d               	DCC 
+   000 010   0e 55           	LCI d8 
+   000 012   0f               	RRC
+                              ;opcodes 10-1F 
+   000 013   14               	IND 
+   000 014   15               	DCD 
+   000 015   16 55           	LDI d8
+   000 017   17               	RAL 
+   000 020   1c               	INE 
+   000 021   1d               	DCE 
+   000 022   1e 55           	LEI d8 
+   000 024   1f               	RAR 
+                              ;opcodes 20-2F
+   000 025   24               	INH 
+   000 026   25               	DCH 
+   000 027   26 55           	LHI d8
+   000 031   2c               	INL 
+   000 032   2d               	DCL 
+   000 033   2e 55           	LLI d8 
+                              ;opcodes 30-3F
+   000 035   31 00 10          	LXI SP,a16		;8080 mnemonic, to init SP
+R  000 040   01 00 10          	LXI B,a16		;not supported
+R  000 043   01 00 10          	LXI D,a16		;not supported
+R  000 046   01 00 10          	LXI H,a16		;not supported
+R  000 051   01 00 10          	LXI PSW,a16	;not supported
+O  000 054   00 00 00       	INA		;not allowed
+O  000 057   00 00 00       	DCA		;not allowed
+O  000 062   00 00 00       	INM		;not supported
+O  000 065   00 00 00       	DCM		;not supported
+   000 070   36 55           	LMI d8
+   000 072   3e 55           	LAI d8 
+                              ;opcodes 40-4F
+   000 074   40               	LBB 
+   000 075   41               	LBC 
+   000 076   42               	LBD 
+   000 077   43               	LBE 
+   000 100   44               	LBH 
+   000 101   45               	LBL 
+   000 102   46               	LBM
+   000 103   47               	LBA 
+   000 104   48               	LCB 
+   000 105   49               	LCC 
+   000 106   4a               	LCD 
+   000 107   4b               	LCE 
+   000 110   4c               	LCH 
+   000 111   4d               	LCL 
+   000 112   4e               	LCM 
+   000 113   4f               	LCA
+                              ;opcodes 50-5F
+   000 114   50               	LDB 
+   000 115   51               	LDC 
+   000 116   52               	LDD 
+   000 117   53               	LDE 
+   000 120   54               	LDH 
+   000 121   55               	LDL 
+   000 122   56               	LDM
+   000 123   57               	LDA 
+   000 124   58               	LEB 
+   000 125   59               	LEC 
+   000 126   5a               	LED 
+   000 127   5b               	LEE 
+   000 130   5c               	LEH 
+   000 131   5d               	LEL 
+   000 132   5e               	LEM 
+   000 133   5f               	LEA
+                              ;opcodes 60-6F
+   000 134   60               	LHB 
+   000 135   61               	LHC 
+   000 136   62               	LHD 
+   000 137   63               	LHE 
+   000 140   64               	LHH 
+   000 141   65               	LHL 
+   000 142   66               	LHM
+   000 143   67               	LHA 
+   000 144   68               	LLB 
+   000 145   69               	LLC 
+   000 146   6a               	LLD 
+   000 147   6b               	LLE 
+   000 150   6c               	LLH 
+   000 151   6d               	LLL 
+   000 152   6e               	LLM 
+   000 153   6f               	LLA
+                              ;opcodes 70-7F
+   000 154   70               	LMB 
+   000 155   71               	LMC 
+   000 156   72               	LMD 
+   000 157   73               	LME 
+   000 160   74               	LMH 
+   000 161   75               	LML 
+   000 162   76               	HLT
+   000 163   77               	LMA 
+   000 164   78               	LAB 
+   000 165   79               	LAC 
+   000 166   7a               	LAD 
+   000 167   7b               	LAE 
+   000 170   7c               	LAH 
+   000 171   7d               	LAL 
+   000 172   7e               	LAM
+                              ;opcodes 80-8F
+   000 173   80               	ADB
+   000 174   81               	ADC
+   000 175   82               	ADD
+   000 176   83               	ADE
+   000 177   84               	ADH
+   000 200   85               	ADL
+   000 201   86               	ADM
+   000 202   87               	ADA
+   000 203   88               	ACB
+   000 204   89               	ACC
+   000 205   8a               	ACD
+   000 206   8b               	ACE
+   000 207   8c               	ACH
+   000 210   8d               	ACL
+   000 211   8e               	ACM
+   000 212   8f               	ACA
+                              ;opcodes 90-9F
+   000 213   90               	SUB
+   000 214   91               	SUC
+   000 215   92               	SUD
+   000 216   93               	SUE
+   000 217   94               	SUH
+   000 220   95               	SUL
+   000 221   96               	SUM
+   000 222   97               	SUA
+   000 223   98               	SBB
+   000 224   99               	SBC
+   000 225   9a               	SBD
+   000 226   9b               	SBE
+   000 227   9c               	SBH
+   000 230   9d               	SBL
+   000 231   9e               	SBM
+   000 232   9f               	SBA
+                              ;opcodes A0-AF
+   000 233   a0               	NDB
+   000 234   a1               	NDC
+   000 235   a2               	NDD
+   000 236   a3               	NDE
+   000 237   a4               	NDH
+   000 240   a5               	NDL 
+   000 241   a6               	NDM 
+   000 242   a7               	NDA
+   000 243   a8               	XRB 
+   000 244   a9               	XRC 
+   000 245   aa               	XRD 
+   000 246   ab               	XRE 
+   000 247   ac               	XRH 
+   000 250   ad               	XRL 
+   000 251   ae               	XRM
+   000 252   af               	XRA
+                              ;opcodes B0-BF 
+   000 253   b0               	ORB 
+   000 254   b1               	ORC 
+   000 255   b2               	ORD 
+   000 256   b3               	ORE 
+   000 257   b4               	ORH 
+   000 260   b5               	ORL 
+   000 261   b6               	ORM 
+   000 262   b7               	ORA 
+   000 263   b8               	CPB 
+   000 264   b9               	CPC 
+   000 265   ba               	CPD 
+   000 266   bb               	CPE 
+   000 267   bc               	CPH 
+   000 270   bd               	CPL 
+   000 271   be               	CPM
+   000 272   bf               	CPA
+                              ;opcodes C0-CF
+   000 273   c0               	RFZ 
+   000 274   c2 00 10          	JFZ a16 
+   000 277   c3 00 10          	JMP a16 
+   000 302   c4 00 10          	CFZ a16 
+   000 305   c6 55           	ADI d8 
+   000 307   c7               	RST 0 
+   000 310   c8               	RZ 
+   000 311   c9               	RET 
+   000 312   ca 00 10          	JZ a16 
+   000 315   cc 00 10          	CZ a16 
+   000 320   cd 00 10          	CAL a16 
+   000 323   ce 55           	ACI d8 
+   000 325   cf               	RST 1
+                              ;opcodes D0-DF
+   000 326   d0               	RFC 
+   000 327   d2 00 10       	JFC a16 
+   000 332   d3 08           	OUT 10
+   000 334   d3 09           	OUT 11 
+   000 336   d3 0a           	OUT 12 
+   000 340   d3 0b           	OUT 13 
+   000 342   d3 0c           	OUT 14 
+   000 344   d3 0d           	OUT 15 
+   000 346   d3 0e           	OUT 16 
+   000 350   d3 0f           	OUT 17
+   000 352   d3 10           	OUT 20 
+   000 354   d3 11           	OUT 21 
+   000 356   d3 12           	OUT 22  
+   000 360   d3 13           	OUT 23 
+   000 362   d3 14           	OUT 24 
+   000 364   d3 15           	OUT 25 
+   000 366   d3 16           	OUT 26 
+   000 370   d3 17           	OUT 27
+   000 372   d3 18           	OUT 30
+   000 374   d3 19           	OUT 31
+   000 376   d3 1a           	OUT 32
+   001 000   d3 1b           	OUT 33
+   001 002   d3 1c           	OUT 34
+   001 004   d3 1d           	OUT 35
+   001 006   d3 1e           	OUT 36
+   001 010   d3 1f           	OUT 37
+   001 012   d4 00 10          	CFC a16 
+   001 015   d6 55           	SUI d8 
+   001 017   d7               	RST 2 
+   001 020   d8               	RC 
+   001 021   da 00 10          	JC a16 
+   001 024   db 00           	INP 0 
+   001 026   db 01           	INP 1 
+   001 030   db 02           	INP 2 
+   001 032   db 03           	INP 3 
+   001 034   db 04           	INP 4 
+   001 036   db 05           	INP 5 
+   001 040   db 06           	INP 6 
+   001 042   db 07           	INP 7
+   001 044   dc 00 10          	CC a16 
+   001 047   de 55           	SBI d8 
+   001 051   df               	RST 3
+                              ;opcodes E0-EF
+   001 052   e0               	RFP 
+   001 053   e2 00 10          	JFP a16 
+   001 056   e4 00 10          	CFP a16 
+   001 061   e6 55           	NDI d8 
+   001 063   e7               	RST 4 
+   001 064   e8               	RP 
+   001 065   ea 00 10          	JP a16
+   001 070   ec 00 10          	CP a16
+   001 073   ee 55           	XRI d8 
+   001 075   ef               	RST 5
+                              ;opcodes F0-FF
+   001 076   f0               	RFS 
+   001 077   f2 00 10          	JFS a16 
+   001 102   f4 00 10          	CFS a16 
+   001 105   f6 55           	ORI d8 
+   001 107   f7               	RST 6 
+   001 110   f8               	RS 
+   001 111   fa 00 10          	JS a16
+   001 114   fc 00 10          	CS a16
+   001 117   fe 55           	CPI d8 
+   001 121   ff               	RST 7 
+                              
+8 Error(s)
+   001 122                     	END
+020 000  a16           000 125  d8            
+
