@@ -1,0 +1,171 @@
+SCELBAL Variable/Constant Address Map
+=====================================
+
+This maps the data section addresses to symbolic names used in scelbal.asm.
+Addresses are in the form page#offset (octal) -> linear hex -> symbol name.
+
+Page 01 (0100H-01FFH) - Variables and Constants
+-----------------------------------------------
+
+Addr (octal)  Addr (hex)  Symbol              Description
+-----------   ---------   ----------------    ---------------------------
+01#003        0103H       OFS_EXP_TEMP        Exponent temp storage
+01#004        0104H       OFS_FP_CONST_1      Floating point constant +1.0
+01#013        010BH       OFS_EXP_COUNTER     Exponent counter (1 byte)
+01#014        010CH       OFS_FP_TEMP         Floating point temp storage
+01#017        010FH       OFS_FP_TEMP_0F      FP temp +3
+01#024        0114H       OFS_FP_CONST_NEG1   Floating point constant -1.0
+01#030        0118H       OFS_SCRATCH_PAD1    Scratch pad area (16 bytes)
+01#034        011CH       OFS_SCRATCH_PAD1+4  Scratch pad +4
+01#037        011FH       OFS_SCRATCH_1F      Scratch pad +7
+01#050        0128H       OFS_RND_CONST1      Random number generator constant
+01#060        0130H       OFS_RND_CONST2      Random number generator constant
+01#064        0134H       OFS_SCRATCH_PAD2    Scratch pad area (12 bytes)
+
+Sign and Mode Indicators:
+01#100        0140H       OFS_SIGN_IND1       Sign indicator 1 (2 bytes)
+01#101        0141H       OFS_SIGN_IND1+1     Sign indicator 1, byte 2
+01#102        0142H       OFS_BITS_COUNTER    Bits counter (1 byte)
+01#103        0143H       OFS_SIGN_IND2       Sign indicator 2 (2 bytes)
+01#104        0144H       OFS_SIGN_IND2+1     Sign indicator 2, byte 2
+01#105        0145H       OFS_INP_DIG_CNT     Input digit counter
+01#106        0146H       OFS_TEMP_STORE      Temporary storage
+01#107        0147H       OFS_OUT_DIG_CNT     Output digit counter
+01#110        0148H       OFS_FP_MODE_IND     FP mode indicator
+
+Floating Point Accumulator (FPACC):
+01#120        0150H       OFS_FPACC_EXT       FPACC extension (4 bytes)
+01#124        0154H       OFS_FPACC           FPACC start (LSW)
+01#124        0154H       OFS_FPACC_LSW       FPACC Least Significant Word
+01#125        0155H       OFS_FPACC_NSW       FPACC Next Significant Word
+01#126        0156H       OFS_FPACC_MSW       FPACC Most Significant Word
+01#127        0157H       OFS_FPACC_EXP       FPACC Exponent
+
+Floating Point Operand (FPOP):
+01#130        0158H       OFS_FPOP_EXT        FPOP extension (4 bytes)
+01#131        0159H       OFS_FPOP_EXT+1      FPOP extension +1
+01#133        015BH       OFS_FPOP_EXT+3      FPOP extension +3
+01#134        015CH       OFS_FPOP            FPOP start (LSW)
+01#134        015CH       OFS_FPOP_LSW        FPOP Least Significant Word
+01#135        015DH       OFS_FPOP_NSW        FPOP Next Significant Word
+01#136        015EH       OFS_FPOP_MSW        FPOP Most Significant Word
+01#137        015FH       OFS_FPOP_EXP        FPOP Exponent
+
+Floating Point Working Area (24 bytes):
+01#140        0160H       OFS_FP_WORK         FP working area start
+01#143        0163H       OFS_FP_WORK_63      FP work +3
+01#144        0164H       OFS_FP_WORK+4       FP work +4
+01#145        0165H       OFS_FP_WORK_65      FP work +5
+01#146        0166H       OFS_FP_WORK_66      FP work +6
+01#150        0168H       OFS_FP_WORK_68      FP work +8
+01#152        016AH       OFS_FP_WORK_6A      FP work +A
+01#153        016BH       OFS_FP_WORK_6B      FP work +B
+01#154        016CH       OFS_FP_WORK_6C      FP work +C
+01#156        016EH       OFS_FP_WORK_6E      FP work +E
+01#157        016FH       OFS_FP_WORK_6F      FP work +F
+01#160        0170H       OFS_FP_WORK_70      FP work +10
+01#164        0174H       OFS_FP_WORK_74      FP work +14
+01#166        0176H       OFS_FP_WORK_76      FP work +16 (output MSW)
+01#167        0177H       OFS_FP_WORK_77      FP work +17
+
+Temporary Register Storage and Constants:
+01#200        0180H       OFS_TEMP_REGS       Temp register storage (D,E,H,L)
+01#210        0188H       OFS_FP_CONST_10     Floating point constant +10.0
+01#214        018CH       OFS_FP_CONST_0P1    Floating point constant +0.1
+
+Counters and Stack Pointers:
+01#220        0190H       OFS_GETINP_CNT      GETINP counter
+01#227        0197H       OFS_ARITH_STKPTR    Arithmetic stack pointer
+01#230        0198H       OFS_FA_STKPTR       FUN/ARRAY stack pointer
+01#230        0198H       OFS_ARITH_STACK     Arithmetic stack (variable)
+
+FOR/NEXT Storage:
+01#304        01C4H       OFS_FN_STEP         FOR/NEXT step size (4 bytes)
+01#306        01C6H       OFS_FN_STEP_C6      FOR/NEXT step +2
+01#310        01C8H       OFS_FN_LIMIT        FOR/NEXT limit value (4 bytes)
+01#314        01CCH       OFS_FN_TEMP         FOR/NEXT temp (4 bytes)
+
+Keyword Lookup Table Entries:
+01#320        01D0H       OFS_KW_THEN         THEN keyword
+01#325        01D5H       OFS_KW_TO           TO keyword
+01#330        01D8H       OFS_KW_STEP         STEP keyword
+01#335        01DDH       OFS_KW_LIST         LIST keyword
+01#342        01E2H       OFS_KW_RUN          RUN keyword
+01#346        01E6H       OFS_KW_SCR          SCR keyword
+01#352        01EAH       OFS_MSG_READY       READY message
+
+Temporary and Working Storage:
+01#360        01F0H       OFS_TEMP_F0         Temp storage
+01#363        01F3H       OFS_TEMP_F3         Temp storage
+01#364        01F4H       OFS_TEMP_F4         Temp storage
+01#366        01F6H       OFS_TEMP_F6         Temp storage
+01#367        01F7H       OFS_TEMP_F7         Temp storage
+01#370        01F8H       OFS_LOOKUP_CNT      Look-up counter
+01#371        01F9H       OFS_TEMP_OP         Temp OP storage
+
+
+Page 26 (1600H-16FFH) - Line Buffer and Syntax Pointers
+-------------------------------------------------------
+
+Addr (octal)  Addr (hex)  Symbol              Description
+-----------   ---------   ----------------    ---------------------------
+26#000        1600H       OFS_LINE_INP_BUF    Line input buffer start (CC + 79 chars)
+26#043        1623H       OFS_COL_COUNTER     Column counter
+26#044        1624H       OFS_COL_024         Column area +1
+26#120        1650H       OFS_SYMBOL_BUF      Symbol buffer start
+26#121        1651H       OFS_SYMBOL_CHAR1    Symbol buffer 1st character
+26#122        1652H       OFS_SYMBOL_CHAR2    Symbol buffer 2nd character
+26#123        1653H       OFS_SYMBOL_BUF+3    Symbol buffer 3rd character
+26#176        167EH       OFS_PARSER_TOKEN    Parser token storage
+26#177        167FH       OFS_TAB_FLAG        TAB flag
+26#200        1680H       OFS_EVAL_CURRENT    EVAL current pointer
+26#201        1681H       OFS_SYNTAX_PTR      Syntax counter/pointer
+26#202        1682H       OFS_SCAN_PTR        SCAN pointer
+26#203        1683H       OFS_TOKEN_STORE     TOKEN storage location
+26#204        1684H       OFS_TEMP_ARRAY      Temp array pointer
+26#205        1685H       OFS_TEMP_085        Temp storage at 85H
+26#206        1686H       OFS_ARRAY_SETUP     Array setup pointer
+26#207        1687H       OFS_LOOP_COUNTER    Loop counter
+26#210        1688H       OFS_OP_STKPTR       Operator stack pointer
+26#274        16BCH       OFS_FUNC_TBL_BASE   Function lookup table base (less 4)
+26#276        16BEH       OFS_EVAL_PTR        EVAL pointer
+26#277        16BFH       OFS_EVAL_FINISH     EVAL finish pointer
+26#340        16E0H       OFS_LINENUM_BUF     Line number buffer
+26#350        16E8H       OFS_AUX_LINENUM     Auxiliary line number buffer
+
+
+Page 27 (1700H-17FFH) - Keyword Table and Variables
+---------------------------------------------------
+
+Addr (octal)  Addr (hex)  Symbol              Description
+-----------   ---------   ----------------    ---------------------------
+27#000        1700H       OFS_KEYWORD_TBL     Keyword table start
+27#073        173BH       OFS_GOSUB_STK_BASE  GOSUB stack base
+27#076        173EH       OFS_ARRAY_TEMP      Array temp / GOSUB stack offset
+27#077        173FH       OFS_SYMVAR_CNT      Symbol variables counter
+27#114        174CH       OFS_ARRAY_VAR       Array variables table
+27#203        1783H       OFS_FA_STACK_TEMP   F/A stack temp storage
+
+
+User Program Buffer (BGNPGRAM page)
+-----------------------------------
+
+Offset        Symbol              Description
+------        ----------------    ---------------------------
+000H          OFS_USER_PROG       User program buffer start
+
+
+Notes:
+------
+- Addresses shown are 8008 split octal (page#offset) and 8080 linear hex
+- Page = high 6 bits (0-63), Offset = low 8 bits (0-255)
+- Linear address = Page * 256 + Offset
+- OFS_ prefix indicates offset within page (low byte of address)
+- Symbols are defined in scelbal.asm and used with MVI L,symbol
+- FP = Floating Point
+- ACC = Accumulator
+- OP = Operand
+- LSW = Least Significant Word
+- NSW = Next Significant Word
+- MSW = Most Significant Word
+- EXP = Exponent
