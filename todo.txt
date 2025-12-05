@@ -1,38 +1,27 @@
-use gh to create private repository named scelbal in my personal git space (avwohl) for
-this project
+note: see schalbal_build.sh, only the scelbal.mac is used.  The other scelbal8080 and .asm files are for 8008 processor earlier versions.
 
-For this project translate in/sc1fast.asm to 8080 mnewmonics. As a first phase.
-When done adapt it to run under the CP/M os (repalce characgter in/out and csave/load).
+You have been using test jig src/trace_scelbal.cc to run scelbal in an emulator you can trap and get debug info out of.
 
-In the late 1970s the programming language scelbal was sold in book form. A corrected
-OCR pdf of the book. https://www.willegal.net/scelbi/SCELBAL_fixed.pdf . The book
-version was very slow.  An updated software release is what we have here that is faster.
-So most of the book is accurate but some of parsing is updated.
+ Completed:
+  - RUN command works - programs execute correctly
+  - Fixed multiple bugs in NOTEND, INSERT, buffer allocation, and overflow detection
 
-For a table of 8008 opcodes oto map to 8080 see in/08_80/08_80_table.txt.  Also the
-other files in that directory.
+  In Progress - FA Stack Issues:
+  The FA (Function/Array) stack has addressing problems. Key findings:
+  - FA_STKPTR (0x177B) and FA_STACK (0x186A) are NOT adjacent in memory
+  - Original 8008 code assumed page-based addressing where both were on same page
+  - Current fixes changed PRIGHT, FUNAR4, and SCAN6 to use FA_STACK-1 as base instead of FA_STKPTR
+  address
 
-After BITOUT: is  a table of data.  The comments say what the data is.  Make
-up names for each variable/constant.  Use the names in the 8080 version. I suggest
-making up a crib sheet mapping addresses to names you make up.  If you can't tell
-from the comments in data then work the other way and read comments in the
-code as to what data is being used.
+  Current Symptoms:
+  - PRINT 5 → works ("5.0")
+  - PRINT (5) → "5.0FA" (value correct, then FA error)
+  - PRINT((5)) → "FA" (pure error, no value)
+  - PRINT INT(5) → "5.0FA" (function works but FA error follows)
 
-For this version translate to 8080 exactly, as in it would IN and OUT for character io. In a later phase we will get it running under CP/M
+  Next Steps to Debug:
+  1. Trace why FA error occurs after successful evaluation
+  2. Check if FUNARR is being called when it shouldn't (with non-empty SYMBOL_BUF)
+  3. Investigate the FUNAR2 loop which searches arrays - may infinite loop when NUM_DIM_ARRAYS=0
+  4. Consider if other code paths are using the old FA_STKPTR+offset addressing pattern
 
-The target assembler is um80, see ~/src/um80. It is installed in the path.
-
-A copy of the intel 8008 processor manual is in docs/external.  Web posts over the
-years claim it has errors.  I don't know of any erratta sheets to say what they
-are. Maybe google multiple sources if needed.
-
-A copy of the scelbal book (an earler version of this program) in docs/external.
-Also in docs/external are add ons to scelbal, one for strings and one for fixed
-point numbers. It would be good pull the assembler out of those and convert
-when done.
-
-For most of the work make a 8008 to 8080 translator in python for the mnewmonics
-and/or binary decode.  The comments and naming data will need followup work on the output.
-But make a tool as after doing the above .asm do the two add on books.
-
-For a good reference to writing for CP/M see ~/src/cpmemu/docs/cpm22*.pdf

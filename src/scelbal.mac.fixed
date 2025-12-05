@@ -3337,7 +3337,7 @@ HIER_IN_TBL:                            ; Label for hierarchy IN table
 	DB	004H                    ; MULTIPLICATION SIGN
 	DB	004H                    ; DIVISION SIGN
 	DB	005H                    ; EXPONENTIATION SIGN
-	DB	007H                    ; LEFT PARENTHESIS (fixed: was 001H, fixes double parens)
+	DB	001H                    ; LEFT PARENTHESIS
 	DB	001H                    ; RIGHT PARENTHESIS
 	DB	002H                    ; NOT ASSIGNED
 	DB	002H                    ; LESS THAN SIGN
@@ -3796,7 +3796,7 @@ SQR1:	LXI H,FPACC_SAVE                ;Else, load H with address of SQR APPROX
 	JMP SQRLOP                      ;Continue ops until approximation converges
 SQRCNV:	LXI H,EXP_COUNTER               ;Load L with address of TEMP register. Fetch the
 	MOV A,M                         ;Exponenent quotient store there into accumulator.
-	LXI H,FPACC_SAVE+3              ;Change L to point to SQR APPROX exponent (FIXED: was SCRATCH_1F which was wrong address!)
+	LXI H,SCRATCH_1F                ;Change L to point to SQR APPROX exponent.
 	ADD M                           ;Add SQR APPROX exponent to quotient value.
 	MOV M,A                         ;Store sum back in SQR APPROX Exponent register.
 	LXI H,FPACC_SAVE                ;Load L with address of SQR APPROX. Transfer the

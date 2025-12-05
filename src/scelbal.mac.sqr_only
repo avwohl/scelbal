@@ -1085,7 +1085,7 @@ PRIGHT:	LDA FA_STKPTR                   ;Fetch the F/A stack pointer value
 	DAD B                           ;Add offset to base to point to top of F/A STACK
 	MOV A,M                         ;Fetch the contents of the top of the F/A STACK into
 	MVI M,000H                      ;The ACC then clear the top of the F/A STACK
-	LXI H,TEMP_STORE                ;Load HL with address of TEMP_STORE (not TOKEN_STORE!)
+	LXI H,TOKEN_STORE               ;Load HL with address of TOKEN_STORE
 	MOV M,A                         ;Store value from top of F/A STACK into temp loc.
 	ANA A                           ;Test to see if token value in top of stack was zero
 	RZ                              ;If so, just had simple grouping parenthesis!
@@ -3337,7 +3337,7 @@ HIER_IN_TBL:                            ; Label for hierarchy IN table
 	DB	004H                    ; MULTIPLICATION SIGN
 	DB	004H                    ; DIVISION SIGN
 	DB	005H                    ; EXPONENTIATION SIGN
-	DB	007H                    ; LEFT PARENTHESIS (fixed: was 001H, fixes double parens)
+	DB	001H                    ; LEFT PARENTHESIS
 	DB	001H                    ; RIGHT PARENTHESIS
 	DB	002H                    ; NOT ASSIGNED
 	DB	002H                    ; LESS THAN SIGN
@@ -3901,11 +3901,7 @@ PRIGH1:	LXI H,FPACC_MSW                 ;Load L with address of the MSW in the F
 	JMP FLOAD                       ;Load floating point value into FPACC and exit.
 
 
-FUNAR2:	LXI H,NUM_DIM_ARRAYS            ;First check if any arrays are defined
-	MOV A,M                         ;Fetch number of arrays
-	ANA A                           ;Test if zero
-	JZ FAERR                        ;If no arrays defined, it's an FA error
-	LXI H,SCAN_PTR                  ;Load HL with address of TEMP COUNTER
+FUNAR2:	LXI H,SCAN_PTR                  ;Load HL with address of TEMP COUNTER
 	MOV B,M                         ;Fetch the counter value
 	INR B                           ;Increment the value
 	MOV M,B                         ;Restore the value to memory
@@ -3963,11 +3959,7 @@ ARRAY5:	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY SETUP poin
 	MOV M,B                         ;Place the pointer value in the EVAL FINISH pointer
 	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
 	MVI M,000H                      ;Initialize LOOP COUNTER to value of zero
-ARRAY6:	LXI H,NUM_DIM_ARRAYS            ;First check if any arrays are defined
-	MOV A,M                         ;Fetch number of arrays
-	ANA A                           ;Test if zero
-	JZ FAERR                        ;If no arrays defined, it's an FA error
-	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
+ARRAY6:	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
 	MOV B,M                         ;Fetch the counter value
 	INR B                           ;Increment it
 	MOV M,B                         ;Restore the counter value to memory

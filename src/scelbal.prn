@@ -1108,7 +1108,7 @@
  1085  06A3  09           	DAD B                           ;Add offset to base to point to top of F/A STACK
  1086  06A4  7E           	MOV A,M                         ;Fetch the contents of the top of the F/A STACK into
  1087  06A5  36 00        	MVI M,000H                      ;The ACC then clear the top of the F/A STACK
- 1088  06A7  21 66 16     	LXI H,TOKEN_STORE               ;Load HL with address of TOKEN_STORE
+ 1088  06A7  21 6B 00     	LXI H,TEMP_STORE                ;Load HL with address of TEMP_STORE (not TOKEN_STORE!)
  1089  06AA  77           	MOV M,A                         ;Store value from top of F/A STACK into temp loc.
  1090  06AB  A7           	ANA A                           ;Test to see if token value in top of stack was zero
  1091  06AC  C8           	RZ                              ;If so, just had simple grouping parenthesis!
@@ -1370,7 +1370,7 @@
  1347  08AB  36 00        	MVI M,000H                      ;In the Variables table also.
  1348  08AD  AF           	XRA A                           ;Clear accumulator
  1349  08AE  32 C0 1A     	STA USER_PROG_BUF               ;Clear first location to indicate end of user program.
- 1350  08B1  21 BF 20     	LXI H,ARRAY_VALUES              ;@@ Load HL with address of ARRAYS storage
+ 1350  08B1  21 CF 20     	LXI H,ARRAY_VALUES              ;@@ Load HL with address of ARRAYS storage
  1351  08B4  06 00        	MVI B,000H                      ;@@ Set counter to 256 (0 means 256 iterations)
  1352  08B6  36 00        SCRLOP:	MVI M,000H                      ;@@ And form a loop to clear out all the locations
  1353  08B8  23           	INX H                           ;@@ On the ARRAYS storage area. (@@ These become
@@ -1710,14 +1710,14 @@
  1687  0B08  FE 0A        	CPI 00AH                        ;Is it token value for RETURN statement?
  1688  0B0A  CA 1F 0E     	JZ RETURN                       ;If yes, then go to the RETURN statement routine.
  1689  0B0D  FE 0B        	CPI 00BH                        ;Is it token value for DIM statement?
- 1690  0B0F  CA B7 1F     	JZ DIM                          ;If yes, then go to the DIM statement routine.
+ 1690  0B0F  CA C7 1F     	JZ DIM                          ;If yes, then go to the DIM statement routine.
  1691  0B12  FE 0C        	CPI 00CH                        ;Is it token value for END statement?
  1692  0B14  CA 44 08     	JZ EXEC                         ;If yes, then go back to the Executive, user pgm finished!
  1693  0B17  FE 0D        	CPI 00DH                        ;Is it token value for IMPLIED LET statement?
  1694  0B19  CA 64 0C     	JZ LET0                         ;If yes, then go to special LET entry point.
  1695  0B1C  FE 0E        	CPI 00EH                        ;@@ Is it token value for ARRAY IMPLIED LET?
  1696  0B1E  C2 E9 08     	JNZ SYNERR                      ;If not, then assume a syntax error condition.
- 1697  0B21  CD 2E 1F     	CALL ARRAY1                     ;@@ Else, perform array storage set up subroutine.
+ 1697  0B21  CD 36 1F     	CALL ARRAY1                     ;@@ Else, perform array storage set up subroutine.
  1698  0B24  21 69 16     	LXI H,ARRAY_SETUP               ;@@ Set HL to array pointer storage location.
  1699  0B27  46           	MOV B,M                         ;@@ Fetch array pointer to register B.
  1700  0B28  21 65 16     	LXI H,SCAN_PTR                  ;@@ Change memory pointer to syntax pntr storage loc.
@@ -1885,7 +1885,7 @@
  1862  0C8D  CA B9 0C     	JZ LET5                         ;If so, go process other side of the statement (after
  1863  0C90  FE A8        	CPI 0A8H                        ;@@ If not, see if character is a right parenthesis
  1864  0C92  C2 A3 0C     	JNZ LET3                        ;If not, continue looking for equal sign
- 1865  0C95  CD 28 1F     	CALL ARRAY                      ;@@ If so, have subscript. Call array set up subroutine.
+ 1865  0C95  CD 30 1F     	CALL ARRAY                      ;@@ If so, have subscript. Call array set up subroutine.
  1866  0C98  21 69 16     	LXI H,ARRAY_SETUP               ;@@ Load HL with address of ARRAY pointer
  1867  0C9B  46           	MOV B,M                         ;@@ Fetch value (points to ")" character of subscript)
  1868  0C9C  21 66 16     	LXI H,TOKEN_STORE               ;@@ Load HL with address of LET pointer
@@ -2111,7 +2111,7 @@
  2088  0E66  CA 91 0E     	JZ INPUT4                       ;Variable that preceeds the comma.
  2089  0E69  FE A8        	CPI 0A8H                        ;If not, see if character is a left parenthesis.
  2090  0E6B  C2 7C 0E     	JNZ INPUT2                      ;If not, continue processing to build up symbolic variable
- 2091  0E6E  CD 34 1F     	CALL ARRAY2                     ;@@ If so, call array subscripting subroutine
+ 2091  0E6E  CD 3C 1F     	CALL ARRAY2                     ;@@ If so, call array subscripting subroutine
  2092  0E71  21 69 16     	LXI H,ARRAY_SETUP               ;@@ Load HL with address of array set up pointer
  2093  0E74  46           	MOV B,M                         ;@@ Fetch pointer value (point to ")" of subscript)
  2094  0E75  21 66 16     	LXI H,TOKEN_STORE               ;@@ Change pointer to address of INPUT pointer
@@ -3380,7 +3380,7 @@
  3337  1695  04           	DB	004H                    ; MULTIPLICATION SIGN
  3338  1696  04           	DB	004H                    ; DIVISION SIGN
  3339  1697  05           	DB	005H                    ; EXPONENTIATION SIGN
- 3340  1698  01           	DB	001H                    ; LEFT PARENTHESIS
+ 3340  1698  07           	DB	007H                    ; LEFT PARENTHESIS (fixed: was 001H, fixes double parens)
  3341  1699  01           	DB	001H                    ; RIGHT PARENTHESIS
  3342  169A  02           	DB	002H                    ; NOT ASSIGNED
  3343  169B  02           	DB	002H                    ; LESS THAN SIGN
@@ -3868,7 +3868,7 @@
  3796  1A4B  C3 0A 1A     	JMP SQRLOP                      ;Continue ops until approximation converges
  3797  1A4E  21 62 00     SQRCNV:	LXI H,EXP_COUNTER               ;Load L with address of TEMP register. Fetch the
  3798  1A51  7E           	MOV A,M                         ;Exponenent quotient store there into accumulator.
- 3799  1A52  21 4E 00     	LXI H,SCRATCH_1F                ;Change L to point to SQR APPROX exponent.
+ 3799  1A52  21 4D 00     	LXI H,FPACC_SAVE+3              ;Change L to point to SQR APPROX exponent (FIXED: was SCRATCH_1F which was wrong address!)
  3800  1A55  86           	ADD M                           ;Add SQR APPROX exponent to quotient value.
  3801  1A56  77           	MOV M,A                         ;Store sum back in SQR APPROX Exponent register.
  3802  1A57  21 4A 00     	LXI H,FPACC_SAVE                ;Load L with address of SQR APPROX. Transfer the
@@ -3943,7 +3943,7 @@
  3871  1EC0  21 21 00     PRIGH1:	LXI H,FPACC_MSW                 ;Load L with address of the MSW in the FPACC
  3872  1EC3  7E           	MOV A,M                         ;Fetch MSW of FPACC into the ACC.
  3873  1EC4  A7           	ANA A                           ;Test to see if value in FPACC is positive.
- 3874  1EC5  FA 21 1F     	JM OUTRNG                       ;If not, go display error message.
+ 3874  1EC5  FA 29 1F     	JM OUTRNG                       ;If not, go display error message.
  3875  1EC8  CD 59 0F     	CALL FPFIX                      ;If O.K. then convert floating point to fixed point
  3876  1ECB  21 1F 00     	LXI H,FPACC                     ;Load L with address of LSAL of converted value
  3877  1ECE  7E           	MOV A,M                         ;Fetch the LSW of the value into the ACC
@@ -3968,245 +3968,253 @@
  3896  1EE8  81           	ADD C                           ;Add subscript offset to array values base
  3897  1EE9  4F           	MOV C,A                         ;Save low byte of address
  3898  1EEA  06 00        	MVI B,000H                      ;Clear B for 16-bit add
- 3899  1EEC  21 BF 20     	LXI H,ARRAY_VALUES              ;Load HL with base of ARRAY VALUES
+ 3899  1EEC  21 CF 20     	LXI H,ARRAY_VALUES              ;Load HL with base of ARRAY VALUES
  3900  1EEF  09           	DAD B                           ;Add offset to get final array element address
  3901  1EF0  C3 67 12     	JMP FLOAD                       ;Load floating point value into FPACC and exit.
  3902                     
  3903                     
- 3904  1EF3  21 65 16     FUNAR2:	LXI H,SCAN_PTR                  ;Load HL with address of TEMP COUNTER
- 3905  1EF6  46           	MOV B,M                         ;Fetch the counter value
- 3906  1EF7  04           	INR B                           ;Increment the value
- 3907  1EF8  70           	MOV M,B                         ;Restore the value to memory
- 3908  1EF9  0E 02        	MVI C,002H                      ;Initialize register C to a value of two for future ops
- 3909  1EFB  21 37 17     	LXI H,ARRAY_VAR                 ;Load L with address of start of ARRAY VARIABLES
- 3910  1EFE  CD 29 07     	CALL TABADR                     ;Calculate address of start of next narne in table.
- 3911  1F01  11 37 16     	LXI D,SYMBOL_BUF                ;Set E to starting address of the SYMBOL BUFFER
- 3912  1F04  CD 2D 02     	CALL STRCP                      ;Compare name in ARRAY VARIABLES table to the
- 3913  1F07  CA 18 1F     	JZ FUNAR3                       ;Contents of the SYMBOL BUFFER. If match, go set up
- 3914  1F0A  21 65 16     	LXI H,SCAN_PTR                  ;Array token value. Else, reset HL to TEMP COUNTER
- 3915  1F0D  7E           	MOV A,M                         ;Fetch the counter value into the accumulator.
- 3916  1F0E  21 23 17     	LXI H,NUM_DIM_ARRAYS            ;Change HL to number of arrays storage location.
- 3917  1F11  BE           	CMP M                           ;Compare number of entries checked against number
- 3918  1F12  C2 F3 1E     	JNZ FUNAR2                      ;Possible. Keep searching table if not finished.
- 3919  1F15  C3 0A 07     	JMP FAERR                       ;If finished and no match than have F/A error condx.
- 3920  1F18  21 65 16     FUNAR3:	LXI H,SCAN_PTR                  ;Load HL with address of TEMP COUNTER
- 3921  1F1B  AF           	XRA A                           ;Clear the accumulator. Subtract the value in the TEMP
- 3922  1F1C  9E           	SBB M                           ;COUNTER from zero to obtain two's complement.
- 3923  1F1D  77           	MOV M,A                         ;Place this back in counter location as ARRAY TOKEN
- 3924  1F1E  C3 15 07     	JMP FUNAR4                      ;VALUE (negative). Go place the value on F/A STACK.
- 3925                     
- 3926                     
- 3927  1F21  3E CF        OUTRNG:	MVI A,0CFH                      ;Load the ASCII code for letter 0 into the accumulator
- 3928  1F23  0E D2        	MVI C,0D2H                      ;Load the ASCII code for letter R into register C
- 3929  1F25  C3 E8 01     	JMP ERROR                       ;Go display Out of Range (OR) error message.
+ 3904  1EF3  21 23 17     FUNAR2:	LXI H,NUM_DIM_ARRAYS            ;First check if any arrays are defined
+ 3905  1EF6  7E           	MOV A,M                         ;Fetch number of arrays
+ 3906  1EF7  A7           	ANA A                           ;Test if zero
+ 3907  1EF8  CA 0A 07     	JZ FAERR                        ;If no arrays defined, it's an FA error
+ 3908  1EFB  21 65 16     	LXI H,SCAN_PTR                  ;Load HL with address of TEMP COUNTER
+ 3909  1EFE  46           	MOV B,M                         ;Fetch the counter value
+ 3910  1EFF  04           	INR B                           ;Increment the value
+ 3911  1F00  70           	MOV M,B                         ;Restore the value to memory
+ 3912  1F01  0E 02        	MVI C,002H                      ;Initialize register C to a value of two for future ops
+ 3913  1F03  21 37 17     	LXI H,ARRAY_VAR                 ;Load L with address of start of ARRAY VARIABLES
+ 3914  1F06  CD 29 07     	CALL TABADR                     ;Calculate address of start of next narne in table.
+ 3915  1F09  11 37 16     	LXI D,SYMBOL_BUF                ;Set E to starting address of the SYMBOL BUFFER
+ 3916  1F0C  CD 2D 02     	CALL STRCP                      ;Compare name in ARRAY VARIABLES table to the
+ 3917  1F0F  CA 20 1F     	JZ FUNAR3                       ;Contents of the SYMBOL BUFFER. If match, go set up
+ 3918  1F12  21 65 16     	LXI H,SCAN_PTR                  ;Array token value. Else, reset HL to TEMP COUNTER
+ 3919  1F15  7E           	MOV A,M                         ;Fetch the counter value into the accumulator.
+ 3920  1F16  21 23 17     	LXI H,NUM_DIM_ARRAYS            ;Change HL to number of arrays storage location.
+ 3921  1F19  BE           	CMP M                           ;Compare number of entries checked against number
+ 3922  1F1A  C2 F3 1E     	JNZ FUNAR2                      ;Possible. Keep searching table if not finished.
+ 3923  1F1D  C3 0A 07     	JMP FAERR                       ;If finished and no match than have F/A error condx.
+ 3924  1F20  21 65 16     FUNAR3:	LXI H,SCAN_PTR                  ;Load HL with address of TEMP COUNTER
+ 3925  1F23  AF           	XRA A                           ;Clear the accumulator. Subtract the value in the TEMP
+ 3926  1F24  9E           	SBB M                           ;COUNTER from zero to obtain two's complement.
+ 3927  1F25  77           	MOV M,A                         ;Place this back in counter location as ARRAY TOKEN
+ 3928  1F26  C3 15 07     	JMP FUNAR4                      ;VALUE (negative). Go place the value on F/A STACK.
+ 3929                     
  3930                     
- 3931                     
- 3932                     
- 3933                     
- 3934  1F28  CD 39 08     ARRAY:	CALL RESTSY                     ;Transfer contents of AUX SYMBOL BUFFER into the
- 3935  1F2B  C3 34 1F     	JMP ARRAY2                      ;SYMBOL BUFFER. (Entry when have actual LET)
- 3936  1F2E  21 65 16     ARRAY1:	LXI H,SCAN_PTR                  ;Load L with address of SCAN pointer
- 3937  1F31  C3 37 1F     	JMP ARRAY3                      ;Proceed to process. (Entry point for IMPLIED LET)
- 3938  1F34  21 66 16     ARRAY2:	LXI H,TOKEN_STORE               ;Load HL with address of LET pointer
- 3939  1F37  46           ARRAY3:	MOV B,M                         ;Fetch pointer to location where "(" found in statement
- 3940  1F38  04           	INR B                           ;Line. Increment it to point to next character in the line.
- 3941  1F39  21 A1 16     	LXI H,EVAL_PTR                  ;Load L with address of EVAL pointer and load it with
- 3942  1F3C  70           	MOV M,B                         ;The starting address for the EVAL routine
- 3943  1F3D  21 69 16     	LXI H,ARRAY_SETUP               ;Change L to address of ARRAY SETUP pointer
- 3944  1F40  70           	MOV M,B                         ;And also store address in that location
- 3945  1F41  21 69 16     ARRAY4:	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY SETUP pointer
- 3946  1F44  CD F2 01     	CALL GETCHR                     ;Fetch character pointed to by ARRAY SETUP pntr
- 3947  1F47  FE A9        	CPI 0A9H                        ;See if character is ")" ? If so, then have located
- 3948  1F49  CA 5C 1F     	JZ ARRAY5                       ;End of the subscript. If not, reset
- 3949  1F4C  21 69 16     	LXI H,ARRAY_SETUP               ;to the ARRAY SETUP pointer. Increment the
- 3950  1F4F  CD 5E 02     	CALL LOOP                       ;Pointer and test for the end of the statement line.
- 3951  1F52  C2 41 1F     	JNZ ARRAY4                      ;If not end of line, continue looking for right paren.
- 3952  1F55  3E C1        	MVI A,0C1H                      ;If reach end of line before right parenthesis than load
- 3953  1F57  0E C6        	MVI C,0C6H                      ;ASCII code for letters A and F and display message
- 3954  1F59  C3 E8 01     	JMP ERROR                       ;Indicating Array Forrnat (AF) error condition
- 3955  1F5C  21 69 16     ARRAY5:	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY SETUP pointer
- 3956  1F5F  46           	MOV B,M                         ;Fetch pointer (pointing to ")"sign) into register B
- 3957  1F60  05           	DCR B                           ;Decrement it to move back to end of subscript number
- 3958  1F61  21 A2 16     	LXI H,EVAL_FINISH               ;Load L with address of EVAL FINISH pointer location
- 3959  1F64  70           	MOV M,B                         ;Place the pointer value in the EVAL FINISH pointer
- 3960  1F65  21 E0 16     	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
- 3961  1F68  36 00        	MVI M,000H                      ;Initialize LOOP COUNTER to value of zero
- 3962  1F6A  21 E0 16     ARRAY6:	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
- 3963  1F6D  46           	MOV B,M                         ;Fetch the counter value
- 3964  1F6E  04           	INR B                           ;Increment it
- 3965  1F6F  70           	MOV M,B                         ;Restore the counter value to memory
- 3966  1F70  0E 02        	MVI C,002H                      ;Set up counter in register C for future ops
- 3967  1F72  21 37 17     	LXI H,ARRAY_VAR                 ;Load L with address of start of ARRAY VARIABLES
- 3968  1F75  CD 29 07     	CALL TABADR                     ;Calculate the address of next entry in the table
- 3969  1F78  11 37 16     	LXI D,SYMBOL_BUF                ;Load DE with starting address of SYMBOL BUFF
- 3970  1F7B  CD 2D 02     	CALL STRCP                      ;Compare entry in table against contents of SYMBOL BF
- 3971  1F7E  CA 8F 1F     	JZ ARRAY7                       ;If match, have found array name in the table.
- 3972  1F81  21 E0 16     	LXI H,LOOP_COUNTER              ;Else, set HL to address of the LOOP COUNTER
- 3973  1F84  7E           	MOV A,M                         ;Fetch the counter value to the ACC
- 3974  1F85  21 23 17     	LXI H,NUM_DIM_ARRAYS            ;Change HL to counter containing number of arrays
- 3975  1F88  BE           	CMP M                           ;Compare number of arrays to count in LOOP CNTR
- 3976  1F89  C2 6A 1F     	JNZ ARRAY6                      ;If more entries in the table, continue looking for match
- 3977  1F8C  C3 0A 07     	JMP FAERR                       ;If no matching name in table then have an error condx.
- 3978  1F8F  CD F5 02     ARRAY7:	CALL EVAL                       ;Call subroutine to evaluate subscript expression
- 3979  1F92  CD 59 0F     	CALL FPFIX                      ;Convert the subscript value obtained to fixed forrnat
- 3980  1F95  21 E0 16     	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
- 3981  1F98  46           	MOV B,M                         ;Fetch the value in the LOOP COUNTER into the ACC
- 3982  1F99  0E 02        	MVI C,002H                      ;Set up counter in register C future ops
- 3983  1F9B  21 37 17     	LXI H,ARRAY_VAR                 ;Load L with address of ARRAY VARIABLES
- 3984  1F9E  CD 29 07     	CALL TABADR                     ;Calculate the address of entry in the table
- 3985  1FA1  23           	INX H                           ;Advance the ARRAY VARIABLES table pointer twice
- 3986  1FA2  23           	INX H                           ;To advance pointer over array name.
- 3987  1FA3  4E           	MOV C,M                         ;Fetch array base address in ARRAY VALUES table
- 3988  1FA4  21 1F 00     	LXI H,FPACC                     ;Load L with address of subscript value
- 3989  1FA7  7E           	MOV A,M                         ;Fetch the subscript value into the accumulator
- 3990  1FA8  D6 01        	SUI 001H                        ;Subtract one from subscript value to allow for zero
- 3991  1FAA  07           	RLC                             ;Origin. Now multiply by four
- 3992  1FAB  07           	RLC                             ;Using rotates (number of bytes required for each entry
- 3993  1FAC  81           	ADD C                           ;In the ARRAY VALUES table). Add in base address to
- 3994  1FAD  21 67 16     	LXI H,TEMP_ARRAY             ;The calculated value to form final address in the
- 3995  1FB0  77           	MOV M,A                         ;ARRAY ELEMENT storage location & store the addr.
- 3996  1FB1  21 68 17     	LXI H,ARRAY_FLAG                ;Change L to point to ARRAY FLAG
- 3997  1FB4  36 FF        	MVI M,0FFH                      ;Set the ARRAY FLAG for future use
- 3998  1FB6  C9           	RET                             ;Exit to calling routine
- 3999                     
- 4000                     
- 4001  1FB7  CD 03 02     DIM:	CALL CLESYM                     ;Initialize the SYMBOL BUFFER to cleared condition
- 4002  1FBA  21 65 16     	LXI H,SCAN_PTR                  ;Load L with address of SCAN pointer
- 4003  1FBD  46           	MOV B,M                         ;Fetch SCAN pointer value into register B
- 4004  1FBE  04           	INR B                           ;Add one to the SCAN pointer value
- 4005  1FBF  21 66 16     	LXI H,TOKEN_STORE               ;Change L to DIM pointer (formerly TOKEN) storage
- 4006  1FC2  70           	MOV M,B                         ;Store the updated SCAN pointer as the DIM pointer
- 4007  1FC3  21 66 16     DIM1:	LXI H,TOKEN_STORE               ;Load L with the address of DIM pointer storage location
- 4008  1FC6  CD F2 01     	CALL GETCHR                     ;Fetch a character from the line input buffer
- 4009  1FC9  CA D4 1F     	JZ DIM2                         ;If character fetched is a space, ignore it
- 4010  1FCC  FE A8        	CPI 0A8H                        ;Else see if character is "(" left parenthesis
- 4011  1FCE  CA E0 1F     	JZ DIM3                         ;If so, should have ARRAY VARIABLE naine in buffer
- 4012  1FD1  CD 1C 02     	CALL CONCTS                     ;If not, append the character to the SYMBOL BUFFER
- 4013  1FD4  21 66 16     DIM2:	LXI H,TOKEN_STORE               ;Load L with the address of DIM pointer stomge location
- 4014  1FD7  CD 5E 02     	CALL LOOP                       ;Increment the pointer and see if end of line
- 4015  1FDA  C2 C3 1F     	JNZ DIM1                        ;If not end of line, fetch next character
- 4016  1FDD  C3 B8 20     	JMP DIMERR                      ;Else have a DIMension error condition
- 4017  1FE0  21 69 16     DIM3:	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY pointer storage loc
- 4018  1FE3  36 00        	MVI M,000H                      ;Initialize ARRAY pointer to starting value of zero
- 4019  1FE5  21 69 16     DIM4:	LXI H,ARRAY_SETUP               ;Load HL with address of ARRAY pointer storage loc
- 4020  1FE8  7E           	MOV A,M                         ;Fetch value in ARRAY pointer to ACC (effectively
- 4021  1FE9  07           	RLC                             ;Represents number of arrays defined in pgm). Rotate
- 4022  1FEA  07           	RLC                             ;Left twice to multiply by four (bytes per table entry)
- 4023  1FEB  4F           	MOV C,A                         ;Save offset in C
- 4024  1FEC  06 00        	MVI B,000H                      ;Clear B for 16-bit add
- 4025  1FEE  21 37 17     	LXI H,ARRAY_VAR                 ;Load HL with base of ARRAY VARIABLES table
- 4026  1FF1  09           	DAD B                           ;Add offset to form pointer to table entry
- 4027  1FF2  11 37 16     	LXI D,SYMBOL_BUF                ;Load DE with starting address of the SYMBOL BUFFER
- 4028  1FF5  CD 2D 02     	CALL STRCP                      ;Compare contents of SYMBOL BF to entry in ARRAY
- 4029  1FF8  CA 96 20     	JZ DIM9                         ;VARIABLES table. If same, have duplicate array name.
- 4030  1FFB  21 69 16     	LXI H,ARRAY_SETUP               ;Else, load L with address of ARRAY pointer storage
- 4031  1FFE  46           	MOV B,M                         ;Fetch the ARRAY pointer value to register B
- 4032  1FFF  04           	INR B                           ;Increment the value
- 4033  2000  70           	MOV M,B                         ;Restore it to ARRAY pointer storage location
- 4034  2001  21 23 17     	LXI H,NUM_DIM_ARRAYS            ;Change HL to number of arrays storage location
- 4035  2004  7E           	MOV A,M                         ;Fetch the number of arrays value to the ACC
- 4036  2005  05           	DCR B                           ;Restore B to previous count
- 4037  2006  B8           	CMP B                           ;Compare number of arrays tested against nr defined
- 4038  2007  C2 E5 1F     	JNZ DIM4                        ;If not equal, continue searching ARRAY VARIABLES
- 4039  200A  21 23 17     	LXI H,NUM_DIM_ARRAYS            ;Table. When table searched with no match, then must
- 4040  200D  46           	MOV B,M                         ;append name to table. Fetch number of arrays and
- 4041  200E  04           	INR B                           ;Add one to account for new name being added.
- 4042  200F  70           	MOV M,B                         ;Restore the updated value back to memory.
- 4043  2010  21 24 17     	LXI H,ARRAY_TEMP                ;Change pointer to ARRAY TEMP pointer storage
- 4044  2013  70           	MOV M,B                         ;Store pointer to current array in ARRAY TEMP too.
- 4045  2014  21 69 16     	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY pointer stomge loc.
- 4046  2017  70           	MOV M,B                         ;And update it also for new array being added.
- 4047  2018  7E           	MOV A,M                         ;Fetch the current ARRAY pointer value to the ACC
- 4048  2019  07           	RLC                             ;Multiply it times four by performing two rotate left
- 4049  201A  07           	RLC                             ;Operations to get offset into ARRAY VARIABLES table
- 4050  201B  4F           	MOV C,A                         ;Save offset in C
- 4051  201C  06 00        	MVI B,000H                      ;Clear B for 16-bit add
- 4052  201E  11 37 17     	LXI D,ARRAY_VAR                 ;Load DE with base of ARRAY VARIABLES table
- 4053  2021  79           	MOV A,C                         ;Get offset
- 4054  2022  83           	ADD E                           ;Add to low byte of base
- 4055  2023  5F           	MOV E,A                         ;Result in E (DE now points to table entry)
- 4056  2024  21 37 16     	LXI H,SYMBOL_BUF                ;Load HL with the start of the SYMBOL BUFFER
- 4057  2027  CD 89 09     	CALL MOVEC                      ;Move the array name from the SYMBOL BUFFER to
- 4058  202A  CD 03 02     	CALL CLESYM                     ;The ARRAY VARIABLES table. Then clear the
- 4059  202D  21 66 16     	LXI H,TOKEN_STORE               ;SYMBOL BUFFER. Reset L to the DIM pointer storage
- 4060  2030  46           	MOV B,M                         ;Fetch the pointer value (points to "(" part of DIM
- 4061  2031  04           	INR B                           ;Statement). Increment the pointer to next character in
- 4062  2032  21 67 16     	LXI H,TEMP_ARRAY                ;The line input buffer. Cbange L to DIMEN pointer.
- 4063  2035  70           	MOV M,B                         ;Store the updated DIM pointer in DIMEN storage loc.
- 4064  2036  21 67 16     DIM5:	LXI H,TEMP_ARRAY                ;Set L to DIMEN pointer storage location
- 4065  2039  CD F2 01     	CALL GETCHR                     ;Fetch character in line input buffer
- 4066  203C  CA 51 20     	JZ DIM6                         ;Ignore character for space
- 4067  203F  FE A9        	CPI 0A9H                        ;If not space, see if character is right parenthesis
- 4068  2041  CA 5D 20     	JZ DIM7                         ;If yes, process DIMension size (array length)
- 4069  2044  FE B0        	CPI 0B0H                        ;If not, see if character is a valid decimal number
- 4070  2046  FA B8 20     	JM DIMERR                       ;If not valid number, have DIMension error condition
- 4071  2049  FE BA        	CPI 0BAH                        ;Continue testing for valid decitnal number
- 4072  204B  F2 B8 20     	JP DIMERR                       ;If not valid number, then DIMension error condition
- 4073  204E  CD 1C 02     	CALL CONCTS                     ;If valid decirnal number, append digit to SYMBOL BF
- 4074  2051  21 67 16     DIM6:	LXI H,TEMP_ARRAY                ;Set L to DIMEN pointer storage location
- 4075  2054  CD 5E 02     	CALL LOOP                       ;Advance the pointer value and check for end of the line
- 4076  2057  C2 36 20     	JNZ DIM5                        ;If not end of line, continue fetching DIMension size
- 4077  205A  C3 B8 20     	JMP DIMERR                      ;If end of line before right parenthesis, have error condx.
- 4078  205D  21 37 16     DIM7:	LXI H,SYMBOL_BUF                ;Load L with address of start of SYMBOL BUFFER
- 4079  2060  CD DD 12     	CALL DINPUT                     ;Contains DIMension size.) Convert buffer to floating
- 4080  2063  CD 59 0F     	CALL FPFIX                      ;Point number and then reformat to fixed point.
- 4081  2066  21 1F 00     	LXI H,FPACC                     ;Load L with address of LSW of fixed point number
- 4082  2069  7E           	MOV A,M                         ; And fetch the low order byte of the nr into the ACC
- 4083  206A  07           	RLC                             ;Rotate it left two tirnes to multiply it by four (the
- 4084  206B  07           	RLC                             ;Number of bytes required to store a floating point nr).
- 4085  206C  4F           	MOV C,A                         ;Store this value in CPU register C temporarily
- 4086  206D  21 24 17     	LXI H,ARRAY_TEMP                ;Set HL to ARRAY TEMP storage location.
- 4087  2070  7E           	MOV A,M                         ;Fetch the value in ARRAY TEMP (array index)
- 4088  2071  D6 01        	SUI 001H                        ;Subtract one from the pointer value
- 4089  2073  07           	RLC                             ;Multiply by four using rotate left
- 4090  2074  07           	RLC                             ;To get offset into ARRAY VARIABLES table
- 4091  2075  C6 02        	ADI 002H                        ;Add 2 to point past name to values pointer location
- 4092  2077  4F           	MOV C,A                         ;Save offset
- 4093  2078  C5           	PUSH B                          ;Save offset
- 4094  2079  06 00        	MVI B,000H                      ;Clear B for 16-bit add
- 4095  207B  21 37 17     	LXI H,ARRAY_VAR                 ;Load HL with base of ARRAY VARIABLES table
- 4096  207E  09           	DAD B                           ;Add offset to point to previous array's values ptr
- 4097  207F  46           	MOV B,M                         ;Fetch the starting address for previous array
- 4098  2080  D1           	POP D                           ;Restore offset to D
- 4099  2081  7A           	MOV A,D                         ;Get offset
- 4100  2082  C6 04        	ADI 004H                        ;Add 4 to point to current array's values ptr location
- 4101  2084  4F           	MOV C,A                         ;Save new offset
- 4102  2085  06 00        	MVI B,000H                      ;Clear B
- 4103  2087  21 37 17     	LXI H,ARRAY_VAR                 ;Load HL with base again
- 4104  208A  09           	DAD B                           ;Add new offset
- 4105  208B  7A           	MOV A,D                         ;Get previous array's starting address
- 4106  208C  81           	ADD C                           ;Add number of bytes required for previous array
- 4107  208D  77           	MOV M,A                         ;Store as starting location for current array
- 4108  208E  21 67 16     DIM8:	LXI H,TEMP_ARRAY                ;Set L to address of DIMEN pointer storage location
- 4109  2091  46           	MOV B,M                         ;Fetch pointer value (points to ") " in line)
- 4110  2092  21 66 16     	LXI H,TOKEN_STORE               ;Change L to DIM pointer storage location
- 4111  2095  70           	MOV M,B                         ;Store former DIMEN value back in DIM pointer
- 4112  2096  21 66 16     DIM9:	LXI H,TOKEN_STORE               ;Load L with address of DIM pointer storage location
- 4113  2099  CD F2 01     	CALL GETCHR                     ;Fetch a character from the line input buffer
- 4114  209C  FE AC        	CPI 0ACH                        ;See if character is a comma (,) sign
- 4115  209E  CA AD 20     	JZ DIM10                        ;If yes, have another array being defined on the line
- 4116  20A1  21 66 16     	LXI H,TOKEN_STORE               ;If not, reset L to the DIM pointer
- 4117  20A4  CD 5E 02     	CALL LOOP                       ;Increment the pointer and see if end of the line
- 4118  20A7  C2 96 20     	JNZ DIM9                        ;If not end of the line, keep looking for a comma
- 4119  20AA  C3 A2 0A     	JMP NXTLIN                      ;Else exit the DIM statement routine to continue pgm
- 4120  20AD  21 66 16     DIM10:	LXI H,TOKEN_STORE               ;Set L to DIM pointer storage location
- 4121  20B0  46           	MOV B,M                         ;Fetch pointer value (points to comma sign just found)
- 4122  20B1  21 65 16     	LXI H,SCAN_PTR                  ;Load L with address of SCAN pointer storage location
- 4123  20B4  70           	MOV M,B                         ;Place DIM pointer into the-SCAN pointer
- 4124  20B5  C3 B7 1F     	JMP DIM                         ;Continue processing DIM statement line for next array
- 4125  20B8  3E C4        DIMERR:	MVI A,0C4H                      ;On error condition, load ASCII code for letter D in ACC
- 4126  20BA  0E C5        	MVI C,0C5H                      ;And ASCII code for letter E in CPU register C
- 4127  20BC  C3 E8 01     	JMP ERROR                       ;Go display the Dirnension Error (DE) message.
- 4128                     
- 4129                     ;;; =========================================================================
- 4130                     ;;; Array Values Storage - DIMensioned array data
- 4131                     ;;; =========================================================================
- 4132                     
- 4133                     ARRAY_VALUES:                           ; Start of array values storage
- 4134                     
- 4135                     	END
+ 3931  1F29  3E CF        OUTRNG:	MVI A,0CFH                      ;Load the ASCII code for letter 0 into the accumulator
+ 3932  1F2B  0E D2        	MVI C,0D2H                      ;Load the ASCII code for letter R into register C
+ 3933  1F2D  C3 E8 01     	JMP ERROR                       ;Go display Out of Range (OR) error message.
+ 3934                     
+ 3935                     
+ 3936                     
+ 3937                     
+ 3938  1F30  CD 39 08     ARRAY:	CALL RESTSY                     ;Transfer contents of AUX SYMBOL BUFFER into the
+ 3939  1F33  C3 3C 1F     	JMP ARRAY2                      ;SYMBOL BUFFER. (Entry when have actual LET)
+ 3940  1F36  21 65 16     ARRAY1:	LXI H,SCAN_PTR                  ;Load L with address of SCAN pointer
+ 3941  1F39  C3 3F 1F     	JMP ARRAY3                      ;Proceed to process. (Entry point for IMPLIED LET)
+ 3942  1F3C  21 66 16     ARRAY2:	LXI H,TOKEN_STORE               ;Load HL with address of LET pointer
+ 3943  1F3F  46           ARRAY3:	MOV B,M                         ;Fetch pointer to location where "(" found in statement
+ 3944  1F40  04           	INR B                           ;Line. Increment it to point to next character in the line.
+ 3945  1F41  21 A1 16     	LXI H,EVAL_PTR                  ;Load L with address of EVAL pointer and load it with
+ 3946  1F44  70           	MOV M,B                         ;The starting address for the EVAL routine
+ 3947  1F45  21 69 16     	LXI H,ARRAY_SETUP               ;Change L to address of ARRAY SETUP pointer
+ 3948  1F48  70           	MOV M,B                         ;And also store address in that location
+ 3949  1F49  21 69 16     ARRAY4:	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY SETUP pointer
+ 3950  1F4C  CD F2 01     	CALL GETCHR                     ;Fetch character pointed to by ARRAY SETUP pntr
+ 3951  1F4F  FE A9        	CPI 0A9H                        ;See if character is ")" ? If so, then have located
+ 3952  1F51  CA 64 1F     	JZ ARRAY5                       ;End of the subscript. If not, reset
+ 3953  1F54  21 69 16     	LXI H,ARRAY_SETUP               ;to the ARRAY SETUP pointer. Increment the
+ 3954  1F57  CD 5E 02     	CALL LOOP                       ;Pointer and test for the end of the statement line.
+ 3955  1F5A  C2 49 1F     	JNZ ARRAY4                      ;If not end of line, continue looking for right paren.
+ 3956  1F5D  3E C1        	MVI A,0C1H                      ;If reach end of line before right parenthesis than load
+ 3957  1F5F  0E C6        	MVI C,0C6H                      ;ASCII code for letters A and F and display message
+ 3958  1F61  C3 E8 01     	JMP ERROR                       ;Indicating Array Forrnat (AF) error condition
+ 3959  1F64  21 69 16     ARRAY5:	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY SETUP pointer
+ 3960  1F67  46           	MOV B,M                         ;Fetch pointer (pointing to ")"sign) into register B
+ 3961  1F68  05           	DCR B                           ;Decrement it to move back to end of subscript number
+ 3962  1F69  21 A2 16     	LXI H,EVAL_FINISH               ;Load L with address of EVAL FINISH pointer location
+ 3963  1F6C  70           	MOV M,B                         ;Place the pointer value in the EVAL FINISH pointer
+ 3964  1F6D  21 E0 16     	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
+ 3965  1F70  36 00        	MVI M,000H                      ;Initialize LOOP COUNTER to value of zero
+ 3966  1F72  21 23 17     ARRAY6:	LXI H,NUM_DIM_ARRAYS            ;First check if any arrays are defined
+ 3967  1F75  7E           	MOV A,M                         ;Fetch number of arrays
+ 3968  1F76  A7           	ANA A                           ;Test if zero
+ 3969  1F77  CA 0A 07     	JZ FAERR                        ;If no arrays defined, it's an FA error
+ 3970  1F7A  21 E0 16     	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
+ 3971  1F7D  46           	MOV B,M                         ;Fetch the counter value
+ 3972  1F7E  04           	INR B                           ;Increment it
+ 3973  1F7F  70           	MOV M,B                         ;Restore the counter value to memory
+ 3974  1F80  0E 02        	MVI C,002H                      ;Set up counter in register C for future ops
+ 3975  1F82  21 37 17     	LXI H,ARRAY_VAR                 ;Load L with address of start of ARRAY VARIABLES
+ 3976  1F85  CD 29 07     	CALL TABADR                     ;Calculate the address of next entry in the table
+ 3977  1F88  11 37 16     	LXI D,SYMBOL_BUF                ;Load DE with starting address of SYMBOL BUFF
+ 3978  1F8B  CD 2D 02     	CALL STRCP                      ;Compare entry in table against contents of SYMBOL BF
+ 3979  1F8E  CA 9F 1F     	JZ ARRAY7                       ;If match, have found array name in the table.
+ 3980  1F91  21 E0 16     	LXI H,LOOP_COUNTER              ;Else, set HL to address of the LOOP COUNTER
+ 3981  1F94  7E           	MOV A,M                         ;Fetch the counter value to the ACC
+ 3982  1F95  21 23 17     	LXI H,NUM_DIM_ARRAYS            ;Change HL to counter containing number of arrays
+ 3983  1F98  BE           	CMP M                           ;Compare number of arrays to count in LOOP CNTR
+ 3984  1F99  C2 72 1F     	JNZ ARRAY6                      ;If more entries in the table, continue looking for match
+ 3985  1F9C  C3 0A 07     	JMP FAERR                       ;If no matching name in table then have an error condx.
+ 3986  1F9F  CD F5 02     ARRAY7:	CALL EVAL                       ;Call subroutine to evaluate subscript expression
+ 3987  1FA2  CD 59 0F     	CALL FPFIX                      ;Convert the subscript value obtained to fixed forrnat
+ 3988  1FA5  21 E0 16     	LXI H,LOOP_COUNTER              ;Load L with address of LOOP COUNTER
+ 3989  1FA8  46           	MOV B,M                         ;Fetch the value in the LOOP COUNTER into the ACC
+ 3990  1FA9  0E 02        	MVI C,002H                      ;Set up counter in register C future ops
+ 3991  1FAB  21 37 17     	LXI H,ARRAY_VAR                 ;Load L with address of ARRAY VARIABLES
+ 3992  1FAE  CD 29 07     	CALL TABADR                     ;Calculate the address of entry in the table
+ 3993  1FB1  23           	INX H                           ;Advance the ARRAY VARIABLES table pointer twice
+ 3994  1FB2  23           	INX H                           ;To advance pointer over array name.
+ 3995  1FB3  4E           	MOV C,M                         ;Fetch array base address in ARRAY VALUES table
+ 3996  1FB4  21 1F 00     	LXI H,FPACC                     ;Load L with address of subscript value
+ 3997  1FB7  7E           	MOV A,M                         ;Fetch the subscript value into the accumulator
+ 3998  1FB8  D6 01        	SUI 001H                        ;Subtract one from subscript value to allow for zero
+ 3999  1FBA  07           	RLC                             ;Origin. Now multiply by four
+ 4000  1FBB  07           	RLC                             ;Using rotates (number of bytes required for each entry
+ 4001  1FBC  81           	ADD C                           ;In the ARRAY VALUES table). Add in base address to
+ 4002  1FBD  21 67 16     	LXI H,TEMP_ARRAY             ;The calculated value to form final address in the
+ 4003  1FC0  77           	MOV M,A                         ;ARRAY ELEMENT storage location & store the addr.
+ 4004  1FC1  21 68 17     	LXI H,ARRAY_FLAG                ;Change L to point to ARRAY FLAG
+ 4005  1FC4  36 FF        	MVI M,0FFH                      ;Set the ARRAY FLAG for future use
+ 4006  1FC6  C9           	RET                             ;Exit to calling routine
+ 4007                     
+ 4008                     
+ 4009  1FC7  CD 03 02     DIM:	CALL CLESYM                     ;Initialize the SYMBOL BUFFER to cleared condition
+ 4010  1FCA  21 65 16     	LXI H,SCAN_PTR                  ;Load L with address of SCAN pointer
+ 4011  1FCD  46           	MOV B,M                         ;Fetch SCAN pointer value into register B
+ 4012  1FCE  04           	INR B                           ;Add one to the SCAN pointer value
+ 4013  1FCF  21 66 16     	LXI H,TOKEN_STORE               ;Change L to DIM pointer (formerly TOKEN) storage
+ 4014  1FD2  70           	MOV M,B                         ;Store the updated SCAN pointer as the DIM pointer
+ 4015  1FD3  21 66 16     DIM1:	LXI H,TOKEN_STORE               ;Load L with the address of DIM pointer storage location
+ 4016  1FD6  CD F2 01     	CALL GETCHR                     ;Fetch a character from the line input buffer
+ 4017  1FD9  CA E4 1F     	JZ DIM2                         ;If character fetched is a space, ignore it
+ 4018  1FDC  FE A8        	CPI 0A8H                        ;Else see if character is "(" left parenthesis
+ 4019  1FDE  CA F0 1F     	JZ DIM3                         ;If so, should have ARRAY VARIABLE naine in buffer
+ 4020  1FE1  CD 1C 02     	CALL CONCTS                     ;If not, append the character to the SYMBOL BUFFER
+ 4021  1FE4  21 66 16     DIM2:	LXI H,TOKEN_STORE               ;Load L with the address of DIM pointer stomge location
+ 4022  1FE7  CD 5E 02     	CALL LOOP                       ;Increment the pointer and see if end of line
+ 4023  1FEA  C2 D3 1F     	JNZ DIM1                        ;If not end of line, fetch next character
+ 4024  1FED  C3 C8 20     	JMP DIMERR                      ;Else have a DIMension error condition
+ 4025  1FF0  21 69 16     DIM3:	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY pointer storage loc
+ 4026  1FF3  36 00        	MVI M,000H                      ;Initialize ARRAY pointer to starting value of zero
+ 4027  1FF5  21 69 16     DIM4:	LXI H,ARRAY_SETUP               ;Load HL with address of ARRAY pointer storage loc
+ 4028  1FF8  7E           	MOV A,M                         ;Fetch value in ARRAY pointer to ACC (effectively
+ 4029  1FF9  07           	RLC                             ;Represents number of arrays defined in pgm). Rotate
+ 4030  1FFA  07           	RLC                             ;Left twice to multiply by four (bytes per table entry)
+ 4031  1FFB  4F           	MOV C,A                         ;Save offset in C
+ 4032  1FFC  06 00        	MVI B,000H                      ;Clear B for 16-bit add
+ 4033  1FFE  21 37 17     	LXI H,ARRAY_VAR                 ;Load HL with base of ARRAY VARIABLES table
+ 4034  2001  09           	DAD B                           ;Add offset to form pointer to table entry
+ 4035  2002  11 37 16     	LXI D,SYMBOL_BUF                ;Load DE with starting address of the SYMBOL BUFFER
+ 4036  2005  CD 2D 02     	CALL STRCP                      ;Compare contents of SYMBOL BF to entry in ARRAY
+ 4037  2008  CA A6 20     	JZ DIM9                         ;VARIABLES table. If same, have duplicate array name.
+ 4038  200B  21 69 16     	LXI H,ARRAY_SETUP               ;Else, load L with address of ARRAY pointer storage
+ 4039  200E  46           	MOV B,M                         ;Fetch the ARRAY pointer value to register B
+ 4040  200F  04           	INR B                           ;Increment the value
+ 4041  2010  70           	MOV M,B                         ;Restore it to ARRAY pointer storage location
+ 4042  2011  21 23 17     	LXI H,NUM_DIM_ARRAYS            ;Change HL to number of arrays storage location
+ 4043  2014  7E           	MOV A,M                         ;Fetch the number of arrays value to the ACC
+ 4044  2015  05           	DCR B                           ;Restore B to previous count
+ 4045  2016  B8           	CMP B                           ;Compare number of arrays tested against nr defined
+ 4046  2017  C2 F5 1F     	JNZ DIM4                        ;If not equal, continue searching ARRAY VARIABLES
+ 4047  201A  21 23 17     	LXI H,NUM_DIM_ARRAYS            ;Table. When table searched with no match, then must
+ 4048  201D  46           	MOV B,M                         ;append name to table. Fetch number of arrays and
+ 4049  201E  04           	INR B                           ;Add one to account for new name being added.
+ 4050  201F  70           	MOV M,B                         ;Restore the updated value back to memory.
+ 4051  2020  21 24 17     	LXI H,ARRAY_TEMP                ;Change pointer to ARRAY TEMP pointer storage
+ 4052  2023  70           	MOV M,B                         ;Store pointer to current array in ARRAY TEMP too.
+ 4053  2024  21 69 16     	LXI H,ARRAY_SETUP               ;Load L with address of ARRAY pointer stomge loc.
+ 4054  2027  70           	MOV M,B                         ;And update it also for new array being added.
+ 4055  2028  7E           	MOV A,M                         ;Fetch the current ARRAY pointer value to the ACC
+ 4056  2029  07           	RLC                             ;Multiply it times four by performing two rotate left
+ 4057  202A  07           	RLC                             ;Operations to get offset into ARRAY VARIABLES table
+ 4058  202B  4F           	MOV C,A                         ;Save offset in C
+ 4059  202C  06 00        	MVI B,000H                      ;Clear B for 16-bit add
+ 4060  202E  11 37 17     	LXI D,ARRAY_VAR                 ;Load DE with base of ARRAY VARIABLES table
+ 4061  2031  79           	MOV A,C                         ;Get offset
+ 4062  2032  83           	ADD E                           ;Add to low byte of base
+ 4063  2033  5F           	MOV E,A                         ;Result in E (DE now points to table entry)
+ 4064  2034  21 37 16     	LXI H,SYMBOL_BUF                ;Load HL with the start of the SYMBOL BUFFER
+ 4065  2037  CD 89 09     	CALL MOVEC                      ;Move the array name from the SYMBOL BUFFER to
+ 4066  203A  CD 03 02     	CALL CLESYM                     ;The ARRAY VARIABLES table. Then clear the
+ 4067  203D  21 66 16     	LXI H,TOKEN_STORE               ;SYMBOL BUFFER. Reset L to the DIM pointer storage
+ 4068  2040  46           	MOV B,M                         ;Fetch the pointer value (points to "(" part of DIM
+ 4069  2041  04           	INR B                           ;Statement). Increment the pointer to next character in
+ 4070  2042  21 67 16     	LXI H,TEMP_ARRAY                ;The line input buffer. Cbange L to DIMEN pointer.
+ 4071  2045  70           	MOV M,B                         ;Store the updated DIM pointer in DIMEN storage loc.
+ 4072  2046  21 67 16     DIM5:	LXI H,TEMP_ARRAY                ;Set L to DIMEN pointer storage location
+ 4073  2049  CD F2 01     	CALL GETCHR                     ;Fetch character in line input buffer
+ 4074  204C  CA 61 20     	JZ DIM6                         ;Ignore character for space
+ 4075  204F  FE A9        	CPI 0A9H                        ;If not space, see if character is right parenthesis
+ 4076  2051  CA 6D 20     	JZ DIM7                         ;If yes, process DIMension size (array length)
+ 4077  2054  FE B0        	CPI 0B0H                        ;If not, see if character is a valid decimal number
+ 4078  2056  FA C8 20     	JM DIMERR                       ;If not valid number, have DIMension error condition
+ 4079  2059  FE BA        	CPI 0BAH                        ;Continue testing for valid decitnal number
+ 4080  205B  F2 C8 20     	JP DIMERR                       ;If not valid number, then DIMension error condition
+ 4081  205E  CD 1C 02     	CALL CONCTS                     ;If valid decirnal number, append digit to SYMBOL BF
+ 4082  2061  21 67 16     DIM6:	LXI H,TEMP_ARRAY                ;Set L to DIMEN pointer storage location
+ 4083  2064  CD 5E 02     	CALL LOOP                       ;Advance the pointer value and check for end of the line
+ 4084  2067  C2 46 20     	JNZ DIM5                        ;If not end of line, continue fetching DIMension size
+ 4085  206A  C3 C8 20     	JMP DIMERR                      ;If end of line before right parenthesis, have error condx.
+ 4086  206D  21 37 16     DIM7:	LXI H,SYMBOL_BUF                ;Load L with address of start of SYMBOL BUFFER
+ 4087  2070  CD DD 12     	CALL DINPUT                     ;Contains DIMension size.) Convert buffer to floating
+ 4088  2073  CD 59 0F     	CALL FPFIX                      ;Point number and then reformat to fixed point.
+ 4089  2076  21 1F 00     	LXI H,FPACC                     ;Load L with address of LSW of fixed point number
+ 4090  2079  7E           	MOV A,M                         ; And fetch the low order byte of the nr into the ACC
+ 4091  207A  07           	RLC                             ;Rotate it left two tirnes to multiply it by four (the
+ 4092  207B  07           	RLC                             ;Number of bytes required to store a floating point nr).
+ 4093  207C  4F           	MOV C,A                         ;Store this value in CPU register C temporarily
+ 4094  207D  21 24 17     	LXI H,ARRAY_TEMP                ;Set HL to ARRAY TEMP storage location.
+ 4095  2080  7E           	MOV A,M                         ;Fetch the value in ARRAY TEMP (array index)
+ 4096  2081  D6 01        	SUI 001H                        ;Subtract one from the pointer value
+ 4097  2083  07           	RLC                             ;Multiply by four using rotate left
+ 4098  2084  07           	RLC                             ;To get offset into ARRAY VARIABLES table
+ 4099  2085  C6 02        	ADI 002H                        ;Add 2 to point past name to values pointer location
+ 4100  2087  4F           	MOV C,A                         ;Save offset
+ 4101  2088  C5           	PUSH B                          ;Save offset
+ 4102  2089  06 00        	MVI B,000H                      ;Clear B for 16-bit add
+ 4103  208B  21 37 17     	LXI H,ARRAY_VAR                 ;Load HL with base of ARRAY VARIABLES table
+ 4104  208E  09           	DAD B                           ;Add offset to point to previous array's values ptr
+ 4105  208F  46           	MOV B,M                         ;Fetch the starting address for previous array
+ 4106  2090  D1           	POP D                           ;Restore offset to D
+ 4107  2091  7A           	MOV A,D                         ;Get offset
+ 4108  2092  C6 04        	ADI 004H                        ;Add 4 to point to current array's values ptr location
+ 4109  2094  4F           	MOV C,A                         ;Save new offset
+ 4110  2095  06 00        	MVI B,000H                      ;Clear B
+ 4111  2097  21 37 17     	LXI H,ARRAY_VAR                 ;Load HL with base again
+ 4112  209A  09           	DAD B                           ;Add new offset
+ 4113  209B  7A           	MOV A,D                         ;Get previous array's starting address
+ 4114  209C  81           	ADD C                           ;Add number of bytes required for previous array
+ 4115  209D  77           	MOV M,A                         ;Store as starting location for current array
+ 4116  209E  21 67 16     DIM8:	LXI H,TEMP_ARRAY                ;Set L to address of DIMEN pointer storage location
+ 4117  20A1  46           	MOV B,M                         ;Fetch pointer value (points to ") " in line)
+ 4118  20A2  21 66 16     	LXI H,TOKEN_STORE               ;Change L to DIM pointer storage location
+ 4119  20A5  70           	MOV M,B                         ;Store former DIMEN value back in DIM pointer
+ 4120  20A6  21 66 16     DIM9:	LXI H,TOKEN_STORE               ;Load L with address of DIM pointer storage location
+ 4121  20A9  CD F2 01     	CALL GETCHR                     ;Fetch a character from the line input buffer
+ 4122  20AC  FE AC        	CPI 0ACH                        ;See if character is a comma (,) sign
+ 4123  20AE  CA BD 20     	JZ DIM10                        ;If yes, have another array being defined on the line
+ 4124  20B1  21 66 16     	LXI H,TOKEN_STORE               ;If not, reset L to the DIM pointer
+ 4125  20B4  CD 5E 02     	CALL LOOP                       ;Increment the pointer and see if end of the line
+ 4126  20B7  C2 A6 20     	JNZ DIM9                        ;If not end of the line, keep looking for a comma
+ 4127  20BA  C3 A2 0A     	JMP NXTLIN                      ;Else exit the DIM statement routine to continue pgm
+ 4128  20BD  21 66 16     DIM10:	LXI H,TOKEN_STORE               ;Set L to DIM pointer storage location
+ 4129  20C0  46           	MOV B,M                         ;Fetch pointer value (points to comma sign just found)
+ 4130  20C1  21 65 16     	LXI H,SCAN_PTR                  ;Load L with address of SCAN pointer storage location
+ 4131  20C4  70           	MOV M,B                         ;Place DIM pointer into the-SCAN pointer
+ 4132  20C5  C3 C7 1F     	JMP DIM                         ;Continue processing DIM statement line for next array
+ 4133  20C8  3E C4        DIMERR:	MVI A,0C4H                      ;On error condition, load ASCII code for letter D in ACC
+ 4134  20CA  0E C5        	MVI C,0C5H                      ;And ASCII code for letter E in CPU register C
+ 4135  20CC  C3 E8 01     	JMP ERROR                       ;Go display the Dirnension Error (DE) message.
  4136                     
- 4137                     
- 4138                     
- 4139                     
+ 4137                     ;;; =========================================================================
+ 4138                     ;;; Array Values Storage - DIMensioned array data
+ 4139                     ;;; =========================================================================
  4140                     
+ 4141                     ARRAY_VALUES:                           ; Start of array values storage
+ 4142                     
+ 4143                     	END
+ 4144                     
+ 4145                     
+ 4146                     
+ 4147                     
+ 4148                     

@@ -19,6 +19,7 @@
 // SCELBAL memory addresses (PRN addresses + 0x100 for CP/M relocation)
 // PRN shows code at 0x0000 but COM loads at 0x0100
 #define RELOC_OFFSET 0x0100
+#define ARITH_STKPTR (0x006F + RELOC_OFFSET)  // Not in symbol file, from PRN
 
 #define FPACC_LSW_M1 (0x001E + RELOC_OFFSET)
 #define FPACC_LSW    (0x001F + RELOC_OFFSET)
@@ -108,9 +109,11 @@ public:
                fetch_mem(FPACC_NSW), fetch_mem(FPACC_MSW), fetch_mem(FPACC_EXP));
     }
     void dump_fpop() {
+        // Use dynamic symbol lookup - addresses changed after NOEXPO fix
+        extern qkz80_uint16 sym(const char*);
         printf("  FPOP: LSW=%02X NSW=%02X MSW=%02X EXP=%02X\n",
-               fetch_mem(FPOP_LSW), fetch_mem(FPOP_NSW),
-               fetch_mem(FPOP_MSW), fetch_mem(FPOP_EXP));
+               fetch_mem(sym("FPOP_LSW")), fetch_mem(sym("FPOP_NSW")),
+               fetch_mem(sym("FPOP_MSW")), fetch_mem(sym("FPOP_EXP")));
     }
     void dump_fpop_ext() {
         printf("  FPOP_EXT6: %02X %02X %02X %02X %02X %02X (59,LSW,NSW,MSW,EXP,TMP)\n",
@@ -204,8 +207,8 @@ qkz80_uint16 sym(const char* name) {
 
 // Simple console I/O simulation
 static char input_buffer[2048] =
-    // Test FA stack issues with parentheses
-    "PRINT((5))\r"
+    // Test various PRINT expressions
+    "PRINT (2*(3+4))\r"
     ;
 static int input_pos = 0;
 static bool got_ready = false;
@@ -316,13 +319,34 @@ int main(int argc, char** argv) {
             continue;
         }
 
+        // Trace SYMBOL_BUF clearing
+        if (pc == sym("CLESYM")) {
+            qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
+            qkz80_uint8 cc = mem.fetch_mem(symbol_buf_addr);
+            printf("\n>>> CLESYM: Clearing SYMBOL_BUF (was cc=%02X)\n", cc);
+        }
+
         // Trace FA stack operations
+        // Trace the MVI M,70H instruction that should init ARITH_STKPTR
+        if (pc == 0x0312 + RELOC_OFFSET) {
+            qkz80_uint16 arith_stkptr_addr = ARITH_STKPTR;
+            qkz80_uint8 hl_low = cpu.regs.HL.get_low();
+            qkz80_uint8 hl_high = cpu.regs.HL.get_high();
+            printf("\n>>> At 0x0312 (MVI M,70H): HL=%02X%02X, ARITH_STKPTR before=%02X\n",
+                   hl_high, hl_low, mem.fetch_mem(arith_stkptr_addr));
+        }
+        if (pc == 0x0314 + RELOC_OFFSET) {
+            qkz80_uint16 arith_stkptr_addr = ARITH_STKPTR;
+            printf(">>> After MVI: ARITH_STKPTR=%02X\n", mem.fetch_mem(arith_stkptr_addr));
+        }
         if (pc == sym("EVAL")) {
             qkz80_uint16 fa_stkptr_addr = sym("FA_STKPT");
             qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
             qkz80_uint16 eval_ptr_addr = sym("EVAL_PTR");
             qkz80_uint16 eval_finish_addr = sym("EVAL_FIN");
             qkz80_uint16 scan_ptr_addr = sym("SCAN_PTR");
+            qkz80_uint16 line_inp_buf = sym("LINE_INP");
+            qkz80_uint16 arith_stkptr_addr = ARITH_STKPTR;
             printf("\n>>> EVAL entry\n");
             printf("  FA_STKPTR=%02X, SYMBOL_BUF (cc=%02X)\n",
                    mem.fetch_mem(fa_stkptr_addr),
@@ -331,6 +355,23 @@ int main(int argc, char** argv) {
                    mem.fetch_mem(eval_ptr_addr),
                    mem.fetch_mem(eval_finish_addr),
                    mem.fetch_mem(scan_ptr_addr));
+            printf("  ARITH_STKPTR (before init)=%02X\n", mem.fetch_mem(arith_stkptr_addr));
+            // Dump LINE_INP_BUF
+            printf("  LINE_INP_BUF: ");
+            qkz80_uint8 buf_len = mem.fetch_mem(line_inp_buf);
+            for (int i = 1; i <= buf_len && i <= 20; i++) {
+                qkz80_uint8 ch = mem.fetch_mem(line_inp_buf + i);
+                printf("%02X ", ch);
+            }
+            printf("\n");
+        }
+        if (pc == sym("SCAN1")) {
+            qkz80_uint16 arith_stkptr_addr = ARITH_STKPTR;
+            static bool first_scan1 = true;
+            if (first_scan1) {
+                first_scan1 = false;
+                printf("\n>>> After EVAL init: ARITH_STKPTR=%02X\n", mem.fetch_mem(arith_stkptr_addr));
+            }
         }
         if (pc == sym("PRINT1")) {
             qkz80_uint16 scan_ptr_addr = sym("SCAN_PTR");
@@ -368,23 +409,98 @@ int main(int argc, char** argv) {
             printf("\n>>> PCOMMA: Handling comma spacing\n");
             printf("  TOKEN_STORE=%02X\n", mem.fetch_mem(token_store_addr));
         }
+        if (pc == sym("SCAN10")) {
+            qkz80_uint16 eval_current_addr = sym("EVAL_CUR");
+            qkz80_uint8 old_pos = mem.fetch_mem(eval_current_addr);
+            printf("\n>>> SCAN10: Incrementing position %02X→%02X\n", old_pos, old_pos + 1);
+        }
+        if (pc == sym("GETCHR")) {
+            qkz80_uint16 eval_current_addr = sym("EVAL_CUR");
+            qkz80_uint16 line_inp_buf = sym("LINE_INP");
+            qkz80_uint8 current_pos = mem.fetch_mem(eval_current_addr);
+            qkz80_uint8 ch = mem.fetch_mem(line_inp_buf + current_pos);
+            qkz80_uint8 hl_low = cpu.regs.HL.get_low();
+            printf("\n>>> GETCHR: pos=%02X, HL_low=%02X, LINE_INP_BUF[%02X]=%02X\n",
+                   current_pos, hl_low, current_pos, ch);
+        }
+        if (pc == sym("SCAN1")) {
+            qkz80_uint16 eval_current_addr = sym("EVAL_CUR");
+            qkz80_uint16 line_inp_buf = sym("LINE_INP");
+            qkz80_uint8 current_pos = mem.fetch_mem(eval_current_addr);
+            qkz80_uint8 ch = mem.fetch_mem(line_inp_buf + current_pos);
+            qkz80_uint8 char_in_a = cpu.regs.AF.get_high();
+            printf(">>> SCAN1: position %02X, char '%c' (0x%02X), A=%02X\n",
+                   current_pos, (ch >= 0x20 && ch < 0x7F) ? ch : '.', ch, char_in_a);
+        }
         if (pc == sym("SCAN6")) {
             qkz80_uint16 fa_stkptr_addr = sym("FA_STKPT");
             qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
-            printf("\n>>> SCAN6: '(' encountered\n");
-            printf("  FA_STKPTR=%02X, SYMBOL_BUF (cc=%02X): '%c%c'\n",
-                   mem.fetch_mem(fa_stkptr_addr),
-                   mem.fetch_mem(symbol_buf_addr),
-                   mem.fetch_mem(symbol_buf_addr+1), mem.fetch_mem(symbol_buf_addr+2));
+            qkz80_uint16 eval_current_addr = sym("EVAL_CUR");
+            qkz80_uint16 op_stkptr_addr = sym("OP_STKPT");
+            qkz80_uint8 fa_ptr = mem.fetch_mem(fa_stkptr_addr);
+            qkz80_uint8 op_ptr = mem.fetch_mem(op_stkptr_addr);
+            qkz80_uint8 sb_cc = mem.fetch_mem(symbol_buf_addr);
+            qkz80_uint8 char_in_a = cpu.regs.AF.get_high();
+            printf("\n>>> SCAN6: '(' encountered at pos %02X, A=%02X\n",
+                   mem.fetch_mem(eval_current_addr), char_in_a);
+            printf("  FA_STKPTR=%02X→%02X, OP_STKPTR=%02X, SYMBOL_BUF (cc=%02X)\n",
+                   fa_ptr, fa_ptr + 1, op_ptr, sb_cc);
         }
         if (pc == sym("SCAN7")) {
             qkz80_uint16 fa_stkptr_addr = sym("FA_STKPT");
             qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
-            printf("\n>>> SCAN7: ')' encountered\n");
-            printf("  FA_STKPTR=%02X, SYMBOL_BUF (cc=%02X): '%c%c'\n",
-                   mem.fetch_mem(fa_stkptr_addr),
-                   mem.fetch_mem(symbol_buf_addr),
-                   mem.fetch_mem(symbol_buf_addr+1), mem.fetch_mem(symbol_buf_addr+2));
+            qkz80_uint16 eval_current_addr = sym("EVAL_CUR");
+            qkz80_uint16 op_stkptr_addr = sym("OP_STKPT");
+            qkz80_uint8 fa_ptr = mem.fetch_mem(fa_stkptr_addr);
+            qkz80_uint8 op_ptr = mem.fetch_mem(op_stkptr_addr);
+            qkz80_uint8 sb_cc = mem.fetch_mem(symbol_buf_addr);
+            qkz80_uint8 char_in_a = cpu.regs.AF.get_high();
+            printf("\n>>> SCAN7: ')' encountered at pos %02X, A=%02X\n",
+                   mem.fetch_mem(eval_current_addr), char_in_a);
+            printf("  FA_STKPTR=%02X→%02X, OP_STKPTR=%02X, SYMBOL_BUF (cc=%02X)\n",
+                   fa_ptr, fa_ptr - 1, op_ptr, sb_cc);
+        }
+        if (pc == sym("PARSER")) {
+            qkz80_uint16 parser_token_addr = sym("PARSER_T");
+            qkz80_uint16 op_stkptr_addr = sym("OP_STKPT");
+            qkz80_uint16 op_stack_addr = sym("OP_STACK");
+            qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
+            qkz80_uint8 token = mem.fetch_mem(parser_token_addr);
+            qkz80_uint8 op_ptr = mem.fetch_mem(op_stkptr_addr);
+            qkz80_uint8 sb_cc = mem.fetch_mem(symbol_buf_addr);
+            printf("\n>>> PARSER: Processing token=%d, OP_STKPTR=%02X, SYMBOL_BUF[cc=%02X",
+                   token, op_ptr, sb_cc);
+            if (sb_cc > 0) {
+                printf(",ch1=%02X", mem.fetch_mem(symbol_buf_addr + 1));
+            }
+            printf("]\n");
+            printf("  OP_STACK[0]=%02X, OP_STACK[%d]=%02X\n",
+                   mem.fetch_mem(op_stack_addr),
+                   op_ptr, mem.fetch_mem(op_stack_addr + op_ptr));
+        }
+        if (pc == sym("PARSE2")) {
+            qkz80_uint16 op_stkptr_addr = sym("OP_STKPT");
+            qkz80_uint8 op_ptr = mem.fetch_mem(op_stkptr_addr);
+            printf("\n>>> PARSE2: Looking for '(' on stack, OP_STKPTR=%02X\n", op_ptr);
+        }
+        if (pc == sym("PARNER")) {
+            printf("\n>>> PARNER: Imbalanced parenthesis error!\n");
+        }
+        if (pc == sym("SYNTX6A")) {
+            qkz80_uint16 scan_ptr_addr = sym("SCAN_PTR");
+            qkz80_uint8 scan_ptr = mem.fetch_mem(scan_ptr_addr);
+            printf("\n>>> SYNTX6A entry: SCAN_PTR=%02X\n", scan_ptr);
+        }
+        if (pc == sym("LOOP")) {
+            qkz80_uint16 scan_ptr_addr = sym("SCAN_PTR");
+            qkz80_uint8 scan_ptr_before = mem.fetch_mem(scan_ptr_addr);
+            // LOOP will increment, so check after
+            // We'll trace this in the next instruction after LOOP returns
+        }
+        if (pc == sym("SYNTX6")) {
+            qkz80_uint16 scan_ptr_addr = sym("SCAN_PTR");
+            qkz80_uint8 scan_ptr = mem.fetch_mem(scan_ptr_addr);
+            printf("\n>>> SYNTX6 (after SYNTX6A): SCAN_PTR=%02X\n", scan_ptr);
         }
         if (pc == sym("CLESYM")) {
             qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
@@ -400,11 +516,21 @@ int main(int argc, char** argv) {
         }
         if (pc == sym("CONCTS")) {
             qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
+            qkz80_uint16 scan_ptr_addr = sym("SCAN_PTR");
             qkz80_uint8 cc = mem.fetch_mem(symbol_buf_addr);
             qkz80_uint8 char_in_a = cpu.regs.AF.get_high();
-            printf("\n>>> CONCTS: Adding char '%c' (0x%02X) to SYMBOL_BUF (cc=%02X→%02X)\n",
+            qkz80_uint8 scan_ptr = mem.fetch_mem(scan_ptr_addr);
+            printf("\n>>> CONCTS: Adding char '%c' (0x%02X) to SYMBOL_BUF (cc=%02X→%02X), SCAN_PTR=%02X\n",
                    (char_in_a >= 0xC1 && char_in_a <= 0xDA) ? (char_in_a - 0x80) : '?',
-                   char_in_a, cc, cc + 1);
+                   char_in_a, cc, cc + 1, scan_ptr);
+        }
+        if (pc == sym("FPOPER")) {
+            qkz80_uint16 arith_stkptr_addr = ARITH_STKPTR;
+            qkz80_uint16 fpacc_msw_addr = sym("FPACC_MS");
+            qkz80_uint8 arith_ptr = mem.fetch_mem(arith_stkptr_addr);
+            qkz80_uint8 op_token = cpu.regs.AF.get_high();
+            printf("\n>>> FPOPER: token=%02X, ARITH_STKPTR=%02X, FPACC_MSW=%02X\n",
+                   op_token, arith_ptr, mem.fetch_mem(fpacc_msw_addr));
         }
         if (pc == sym("FUNARR")) {
             qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
@@ -432,11 +558,16 @@ int main(int argc, char** argv) {
         if (pc == sym("PRIGHT")) {
             qkz80_uint16 fa_stkptr_addr = sym("FA_STKPT");
             qkz80_uint16 fa_stack_addr = sym("FA_STACK");
+            qkz80_uint16 eval_current_addr = sym("EVAL_CUR");
+            qkz80_uint16 eval_finish_addr = sym("EVAL_FIN");
             qkz80_uint8 stack_ptr = mem.fetch_mem(fa_stkptr_addr);
+            qkz80_uint8 eval_current = mem.fetch_mem(eval_current_addr);
+            qkz80_uint8 eval_finish = mem.fetch_mem(eval_finish_addr);
             printf("\n>>> PRIGHT: Processing ')'\n");
             printf("  FA_STKPTR=%02X, FA_STACK[%02X]=%02X\n",
                    stack_ptr, stack_ptr,
                    mem.fetch_mem(fa_stack_addr + stack_ptr - 1));
+            printf("  EVAL_CURRENT=%02X, EVAL_FINISH=%02X\n", eval_current, eval_finish);
         }
         if (pc == sym("ARRAY")) {
             qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
@@ -530,6 +661,80 @@ int main(int argc, char** argv) {
                        mem.fetch_mem(addr+4), mem.fetch_mem(addr+5));
             }
         }
+        if (pc == sym("NOEXPO")) {
+            qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
+            qkz80_uint16 arith_stkptr_addr = ARITH_STKPTR;
+            qkz80_uint16 fpacc_msw_addr = sym("FPACC_MS");
+            qkz80_uint8 cc = mem.fetch_mem(symbol_buf_addr);
+            qkz80_uint8 arith_ptr_before = mem.fetch_mem(arith_stkptr_addr);
+            printf("\n>>> NOEXPO entry: SYMBOL_BUF (cc=%02X, ch1=%02X)\n",
+                   cc, mem.fetch_mem(symbol_buf_addr + 1));
+            printf("  ARITH_STKPTR (before)=%02X, FPACC before FSTORE=", arith_ptr_before);
+            mem.dump_fpacc();
+        }
+        // Trace FSTORE - what value is being pushed to arithmetic stack
+        if (pc == sym("FSTORE")) {
+            qkz80_uint16 hl = cpu.regs.HL.get_pair16();
+            printf("\n>>> FSTORE: Storing FPACC to stack at HL=%04X, FPACC=", hl);
+            mem.dump_fpacc();
+        }
+        // Trace DINPUT - what number is being parsed into FPACC
+        if (pc == sym("DINPUT")) {
+            qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
+            printf("\n>>> DINPUT: Converting SYMBOL_BUF to FPACC, buf='%c%c', FPACC before=",
+                   mem.fetch_mem(symbol_buf_addr + 1), mem.fetch_mem(symbol_buf_addr + 2));
+            mem.dump_fpacc();
+        }
+        // Trace DINPUT exit
+        static qkz80_uint16 dinput_ret_addr = 0;
+        if (pc == sym("DINPUT")) {
+            dinput_ret_addr = mem.fetch_mem(cpu.regs.SP.get_pair16()) |
+                             (mem.fetch_mem(cpu.regs.SP.get_pair16() + 1) << 8);
+        }
+        if (dinput_ret_addr != 0 && pc == dinput_ret_addr) {
+            printf(">>> DINPUT exit: FPACC after parse=");
+            mem.dump_fpacc();
+            dinput_ret_addr = 0;
+        }
+        // Trace OPLOAD - what value is being loaded from arithmetic stack to FPOP
+        if (pc == sym("OPLOAD")) {
+            qkz80_uint16 hl = cpu.regs.HL.get_pair16();
+            printf("\n>>> OPLOAD: Loading from stack at HL=%04X to FPOP\n", hl);
+            printf("  Stack contents: %02X %02X %02X %02X\n",
+                   mem.fetch_mem(hl), mem.fetch_mem(hl+1),
+                   mem.fetch_mem(hl+2), mem.fetch_mem(hl+3));
+        }
+        // Trace FPOPER entry
+        if (pc == sym("FPOPER")) {
+            qkz80_uint16 arith_stkptr_addr = ARITH_STKPTR;
+            qkz80_uint8 arith_ptr = mem.fetch_mem(arith_stkptr_addr);
+            printf("\n>>> FPOPER: ARITH_STKPTR=%02X, FPACC=", arith_ptr);
+            mem.dump_fpacc();
+        }
+        if (pc == sym("PARSE")) {
+            // Check ARITH_STKPTR after NOEXPO completes (when it jumps to PARSE)
+            qkz80_uint16 arith_stkptr_addr = ARITH_STKPTR;
+            static int parse_count = 0;
+            static qkz80_uint8 last_arith_ptr = 0;
+            qkz80_uint8 arith_ptr = mem.fetch_mem(arith_stkptr_addr);
+            if (arith_ptr != last_arith_ptr && arith_ptr != 0) {
+                printf("  >>> At PARSE: ARITH_STKPTR changed from %02X to %02X\n",
+                       last_arith_ptr, arith_ptr);
+                last_arith_ptr = arith_ptr;
+            }
+            if (parse_count < 3) {
+                parse_count++;
+                if (arith_ptr != 0) {  // Only print if non-zero (after NOEXPO runs)
+                    printf("  >>> At PARSE #%d: ARITH_STKPTR=%02X\n", parse_count, arith_ptr);
+                }
+            }
+        }
+        if (pc == sym("PARNUM")) {
+            qkz80_uint16 symbol_buf_addr = sym("SYMBOL_B");
+            qkz80_uint8 cc = mem.fetch_mem(symbol_buf_addr);
+            printf("\n>>> PARNUM: Parsing number, SYMBOL_BUF cc=%02X, ch1=%02X\n",
+                   cc, mem.fetch_mem(symbol_buf_addr + 1));
+        }
         if (pc == LOOKUP) {
             printf("\n>>> LOOKUP: Looking up variable\n");
             printf("  SYMBOL_BUF (cc=%02X): '%c%c'\n", mem.fetch_mem(SYMBOL_BUF),
@@ -554,7 +759,7 @@ int main(int argc, char** argv) {
             mem.dump_fpacc();
         }
         static int fpmult_count = 0;
-        if (pc == FPMULT) {
+        if (pc == sym("FPMULT")) {
             fpmult_count++;
             if (fpmult_count <= 10) {
                 printf("\n>>> FPMULT[%d]: FPACC=", fpmult_count);
