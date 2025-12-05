@@ -373,7 +373,16 @@ SYNTX4:	LXI H,SCAN_PTR                  ;Set pntr to SCAN pntr stomge location
 	CPI 0BDH                        ;For space, ignore. Else, compare character with "=" sign
 	JZ SYNTX7                       ;If is an equal sign, go set TOKEN for IMPLIED LET.
 	CPI 0A8H                        ;Else, compare character with left parenthesis " ( "
-	JZ SYNTX8                       ;If left parenthesis, go set TOKEN for implied array LET
+	JNZ SYNTX4A                     ;If not '(', continue normal processing
+	; Found '(' - check if SYMBOL_BUF length suggests keyword (>=3) vs array (<=2)
+	PUSH PSW                        ;Save '(' character
+	LXI H,SYMBOL_BUF                ;Point to SYMBOL_BUF
+	MOV A,M                         ;Get character count
+	CPI 003H                        ;Is length >= 3?
+	POP PSW                         ;Restore '(' character
+	JNC SYNTX6                      ;If >=3 chars, likely keyword - go to keyword matching
+	JMP SYNTX8                      ;If <3 chars, treat as array subscript
+SYNTX4A:
 	CALL CONCTS                     ;Otherwise, concatenate the character onto the string
 ; MGA 4/2012 begin "fast SYNTX5" patch:
 ; the following patch doubles the overall speed of execution.
@@ -3322,7 +3331,7 @@ HIER_OUT_TBL:                           ; Label for hierarchy OUT table
 	DB	004H                    ; MULTIPLICATION SIGN
 	DB	004H                    ; DIVISION SIGN
 	DB	005H                    ; EXPONENT SIGN
-	DB	006H                    ; LEFT PARENTHESIS
+	DB	001H                    ; LEFT PARENTHESIS (LOW priority on stack)
 	DB	001H                    ; RIGHT PARENTHESIS
 	DB	002H                    ; NOT ASSIGNED
 	DB	002H                    ; LESS THAN SIGN
@@ -3341,7 +3350,7 @@ HIER_IN_TBL:                            ; Label for hierarchy IN table
 	DB	004H                    ; MULTIPLICATION SIGN
 	DB	004H                    ; DIVISION SIGN
 	DB	005H                    ; EXPONENTIATION SIGN
-	DB	007H                    ; LEFT PARENTHESIS (fixed: was 001H, fixes double parens)
+	DB	007H                    ; LEFT PARENTHESIS
 	DB	001H                    ; RIGHT PARENTHESIS
 	DB	002H                    ; NOT ASSIGNED
 	DB	002H                    ; LESS THAN SIGN
