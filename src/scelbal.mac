@@ -2961,6 +2961,10 @@ POSEXP:	LXI H,TEMP_STORE                ;Set pointer to PERIOD indicator storage
 EXPOK:	LXI H,FP_WORK_6F                ;Change pointer to input exponent storage location
 	ADD M                           ;Add this value to negated digit counter value
 	MOV M,A                         ;Restore new value to storage location
+	PUSH PSW                        ;Save ACC and flags (need to preserve for JM/RZ checks below)
+	XRA A                           ;Clear accumulator
+	STA TEMP_STORE                  ;Clear PERIOD indicator for next number parse
+	POP PSW                         ;Restore ACC and flags
 	JM MINEXP                       ;If new value is minus, skip over next subroutine
 	RZ                              ;If new value is zero, no further processing required
 
