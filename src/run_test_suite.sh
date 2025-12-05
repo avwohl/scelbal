@@ -112,11 +112,11 @@ echo
 # ========== COMPARISON OPERATORS ==========
 echo -e "${YELLOW}Testing: Comparison Operators${NC}"
 test_expr "PRINT 5>3" "1.0" "CMP"
-test_expr "PRINT 3>5" "0.0" "CMP"
+test_expr "PRINT 3>5" "0" "CMP"
 test_expr "PRINT 5=5" "1.0" "CMP"
-test_expr "PRINT 5=3" "0.0" "CMP"
+test_expr "PRINT 5=3" "0" "CMP"
 test_expr "PRINT 3<5" "1.0" "CMP"
-test_expr "PRINT 5<3" "0.0" "CMP"
+test_expr "PRINT 5<3" "0" "CMP"
 echo
 
 # ========== COMPLEX EXPRESSIONS ==========

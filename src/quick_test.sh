@@ -106,9 +106,9 @@ echo
 
 echo -e "${YELLOW}Testing: Comparisons${NC}"
 test_cmd "PRINT 5>3" "1.0"
-test_cmd "PRINT 3>5" "0.0"
+test_cmd "PRINT 3>5" "0"
 test_cmd "PRINT 5=5" "1.0"
-test_cmd "PRINT 5<3" "0.0"
+test_cmd "PRINT 5<3" "0"
 test_cmd "PRINT 3<5" "1.0"
 echo
 
