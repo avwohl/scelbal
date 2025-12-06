@@ -11,11 +11,13 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC_DIR="$SCRIPT_DIR/../src"
 TEST_FILE="$SCRIPT_DIR/tests_all.txt"
 INPUT_FILE="/tmp/scelbal_test_input.txt"
 OUTPUT_FILE="/tmp/scelbal_test_output.txt"
-COM_FILE="$SCRIPT_DIR/scelbal.com"
-TRACER="$SCRIPT_DIR/trace_scelbal"
+COM_FILE="$SRC_DIR/scelbal.com"
+TRACER="$SRC_DIR/trace_scelbal"
+TRACER_SRC="$SRC_DIR/trace_scelbal.cc"
 
 # Check if files exist
 if [ ! -f "$TEST_FILE" ]; then
@@ -68,10 +70,10 @@ test_expr() {
     fi
 
     # Update tracer
-    sed -i "s|\".*\\\r\"|\"$expr\\\r\"|" trace_scelbal.cc
+    sed -i "s|\".*\\\r\"|\"$expr\\\r\"|" "$TRACER_SRC"
 
     # Compile
-    if ! g++ -O2 -I/home/wohl/src/cpmemu/src -o trace_scelbal trace_scelbal.cc \
+    if ! g++ -O2 -I/home/wohl/src/cpmemu/src -o "$TRACER" "$TRACER_SRC" \
         /home/wohl/src/cpmemu/src/qkz80.cc /home/wohl/src/cpmemu/src/qkz80_mem.cc \
         /home/wohl/src/cpmemu/src/qkz80_reg_set.cc /home/wohl/src/cpmemu/src/qkz80_errors.cc 2>&1 > /dev/null; then
         echo -e "${RED}✗ Build failed: $expr${NC}"
@@ -80,7 +82,7 @@ test_expr() {
     fi
 
     # Run
-    result=$(./trace_scelbal scelbal.com 2>&1 | grep -a "^[[:space:]]*[-0-9]" | head -1 | tr -d ' ')
+    result=$("$TRACER" "$COM_FILE" 2>&1 | grep -a "^[[:space:]]*[-0-9]" | head -1 | tr -d ' ')
 
     # Compare
     if [ "$result" == "$expected" ]; then

@@ -1,6 +1,10 @@
 #!/bin/bash
 # Verify test suite setup
 
+cd "$(dirname "$0")"
+SRC_DIR="../src"
+DOCS_DIR="../docs"
+
 echo "SCELBAL Test Suite Verification"
 echo "================================"
 echo
@@ -40,15 +44,15 @@ check_executable "run_tests.py"
 check_executable "run_test_suite.sh"
 echo
 
-echo "SCELBAL Files:"
-check_file "scelbal.com"
-check_file "scelbal.mac"
-check_file "scelbal.sym"
-check_file "trace_scelbal.cc"
+echo "SCELBAL Files (in src/):"
+check_file "$SRC_DIR/scelbal.com"
+check_file "$SRC_DIR/scelbal.mac"
+check_file "$SRC_DIR/scelbal.sym"
+check_file "$SRC_DIR/trace_scelbal.cc"
 echo
 
-echo "Documentation:"
-check_file "TEST_README.md"
+echo "Documentation (in docs/):"
+check_file "$DOCS_DIR/TEST_README.md"
 echo
 
 # Count tests
@@ -77,10 +81,10 @@ if [ $errors -eq 0 ]; then
     echo "  ./test_print.sh      # Run parentheses tests (9 tests, ~1 min)"
     echo "  ./run_all_tests.sh   # Run COMPLETE test suite (600+ tests, ~60 min)"
     echo
-    echo "Documentation:"
-    echo "  TEST_README.md               # Getting started guide"
-    echo "  COMPLETE_TEST_COVERAGE.md    # Full coverage analysis"
-    echo "  TESTING_SUMMARY.md           # Overview and examples"
+    echo "Documentation (in docs/):"
+    echo "  ../docs/TEST_README.md               # Getting started guide"
+    echo "  ../docs/COMPLETE_TEST_COVERAGE.md    # Full coverage analysis"
+    echo "  ../docs/TESTING_SUMMARY.md           # Overview and examples"
     exit 0
 else
     echo "✗ $errors file(s) missing or not executable"

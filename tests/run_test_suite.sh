@@ -14,16 +14,23 @@ pass_count=0
 fail_count=0
 skip_count=0
 
+# Paths to src directory
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SRC_DIR="$SCRIPT_DIR/../src"
+TRACER_SRC="$SRC_DIR/trace_scelbal.cc"
+TRACER_BIN="$SRC_DIR/trace_scelbal"
+COM_FILE="$SRC_DIR/scelbal.com"
+
 test_expr() {
     local expr="$1"
     local expected="$2"
     local category="$3"
 
     # Update input in tracer
-    sed -i "s|\".*\\\r\"|\"$expr\\\r\"|" trace_scelbal.cc
+    sed -i "s|\".*\\\r\"|\"$expr\\\r\"|" "$TRACER_SRC"
 
     # Rebuild quietly
-    if ! g++ -O2 -I/home/wohl/src/cpmemu/src -o trace_scelbal trace_scelbal.cc \
+    if ! g++ -O2 -I/home/wohl/src/cpmemu/src -o "$TRACER_BIN" "$TRACER_SRC" \
         /home/wohl/src/cpmemu/src/qkz80.cc /home/wohl/src/cpmemu/src/qkz80_mem.cc \
         /home/wohl/src/cpmemu/src/qkz80_reg_set.cc /home/wohl/src/cpmemu/src/qkz80_errors.cc 2>&1 > /dev/null; then
         echo -e "${RED}✗ Build failed for: $expr${NC}"
@@ -31,7 +38,7 @@ test_expr() {
     fi
 
     # Run and get output
-    result=$(./trace_scelbal scelbal.com 2>&1 | grep -a "^[[:space:]]*[-0-9]" | head -1 | tr -d ' ')
+    result=$("$TRACER_BIN" "$COM_FILE" 2>&1 | grep -a "^[[:space:]]*[-0-9]" | head -1 | tr -d ' ')
 
     if [ "$result" == "$expected" ]; then
         echo -e "${GREEN}✓${NC} [$category] $expr = $result"

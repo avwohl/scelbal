@@ -19,6 +19,12 @@ echo
 
 cd "$(dirname "$0")"
 
+# Paths to src directory
+SRC_DIR="../src"
+TRACER_SRC="$SRC_DIR/trace_scelbal.cc"
+TRACER_BIN="$SRC_DIR/trace_scelbal"
+COM_FILE="$SRC_DIR/scelbal.com"
+
 total_passed=0
 total_failed=0
 total_tests=0
@@ -32,10 +38,10 @@ test_cmd() {
     ((total_tests++))
 
     # Update tracer
-    sed -i "s|\".*\\\\r\"|\"$cmd\\\\r\"|" trace_scelbal.cc 2>/dev/null || true
+    sed -i "s|\".*\\\\r\"|\"$cmd\\\\r\"|" "$TRACER_SRC" 2>/dev/null || true
 
     # Compile (suppress warnings, only show errors)
-    if ! g++ -O2 -I/home/wohl/src/cpmemu/src -o trace_scelbal trace_scelbal.cc \
+    if ! g++ -O2 -I/home/wohl/src/cpmemu/src -o "$TRACER_BIN" "$TRACER_SRC" \
         /home/wohl/src/cpmemu/src/qkz80.cc /home/wohl/src/cpmemu/src/qkz80_mem.cc \
         /home/wohl/src/cpmemu/src/qkz80_reg_set.cc /home/wohl/src/cpmemu/src/qkz80_errors.cc \
         2>&1 | grep -i "error:"; then
@@ -47,7 +53,7 @@ test_cmd() {
     fi
 
     # Run and get result (match lines ending with \r to avoid debug output)
-    result=$(timeout 2 ./trace_scelbal scelbal.com 2>&1 | grep -Ea "^[[:space:]]*-?[0-9][0-9.E+-]*"$'\r' | head -1 | tr -d ' \r' || echo "TIMEOUT")
+    result=$(timeout 2 "$TRACER_BIN" "$COM_FILE" 2>&1 | grep -Ea "^[[:space:]]*-?[0-9][0-9.E+-]*"$'\r' | head -1 | tr -d ' \r' || echo "TIMEOUT")
 
     # Check result (handle floating point comparison)
     if [ "$result" == "$expected" ]; then

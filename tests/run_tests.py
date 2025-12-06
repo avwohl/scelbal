@@ -187,9 +187,10 @@ def run_test(test: Test, tracer_path: str, com_path: str) -> bool:
 
 def main():
     script_dir = Path(__file__).parent
+    src_dir = script_dir.parent / 'src'
     test_file = script_dir / 'tests_all.txt'
-    tracer_path = str(script_dir / 'trace_scelbal')
-    com_path = str(script_dir / 'scelbal.com')
+    tracer_path = str(src_dir / 'trace_scelbal')
+    com_path = str(src_dir / 'scelbal.com')
 
     print("=" * 60)
     print("SCELBAL Comprehensive Test Suite")
